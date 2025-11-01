@@ -98,7 +98,9 @@ defmodule BooleanAlgebraTest do
     assert BooleanAlgebra.eval(expr, %{a: true, b: true, c: true}) == false
   end
 
-  test "missing var_nodeiable returns false" do
-    assert BooleanAlgebra.eval(AST.var_node(:missing), %{a: true}) == false
+  test "missing var_nodeiable in context raises error" do
+    assert_raise ArgumentError, fn ->
+      BooleanAlgebra.eval(AST.var_node(:missing), %{a: true})
+    end
   end
 end
