@@ -1,0 +1,54 @@
+defmodule BooleanAlgebra.AST do
+  @moduledoc """
+  Abstract Syntax Tree representation for boolean expressions.
+  """
+
+  @type t ::
+          {:var, String.t()}
+          | {:const, boolean()}
+          | {:not, t()}
+          | {:and, t(), t()}
+          | {:or, t(), t()}
+          | {:xor, t(), t()}
+
+  @doc """
+  Creates a variable node.
+  """
+  def var_node(name), do: {:var, name}
+
+  @doc """
+  Creates a constant node (true/false).
+  """
+  def const_node(value) when is_boolean(value), do: {:const, value}
+
+  @doc """
+  Creates a NOT node.
+  """
+  def not_node(expr), do: {:not, expr}
+
+  @doc """
+  Creates an AND node.
+  """
+  def and_node(left, right), do: {:and, left, right}
+
+  @doc """
+  Creates an OR node.
+  """
+  def or_node(left, right), do: {:or, left, right}
+
+  @doc """
+  Creates an XOR node.
+  """
+  def xor_node(left, right), do: {:xor, left, right}
+
+  @doc """
+  Evaluates the boolean expression with given variable assignments.
+  """
+  def eval(expr, vars \\ %{})
+  def eval({:const, value}, _vars), do: value
+  def eval({:var, name}, vars), do: Map.get(vars, name, false)
+  def eval({:not, expr}, vars), do: not eval(expr, vars)
+  def eval({:and, left, right}, vars), do: eval(left, vars) and eval(right, vars)
+  def eval({:or, left, right}, vars), do: eval(left, vars) or eval(right, vars)
+  def eval({:xor, left, right}, vars), do: eval(left, vars) != eval(right, vars)
+end

@@ -1,18 +1,19 @@
 defmodule BooleanAlgebra do
   @moduledoc """
-  Documentation for `BooleanAlgebra`.
+  A library for boolean algebra operations
   """
+
+  alias BooleanAlgebra.{AST, Simplifier}
 
   @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> BooleanAlgebra.hello()
-      :world
-
+  Simplifies a boolean expression.
   """
-  def hello do
-    :world
-  end
+  defdelegate simplify(expr), to: Simplifier
+
+
+  @doc """
+  Evaluates a boolean expression with given variable assignments.
+  """
+  defdelegate eval(expr, vars \\ %{}), to: AST
+
 end
