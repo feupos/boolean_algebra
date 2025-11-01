@@ -3,7 +3,7 @@ defmodule BooleanAlgebra do
   A library for boolean algebra operations
   """
 
-  alias BooleanAlgebra.{AST, Simplifier}
+  alias BooleanAlgebra.{AST, Simplifier, Parser}
 
   @doc """
   Simplifies a boolean expression.
@@ -14,4 +14,9 @@ defmodule BooleanAlgebra do
   Evaluates a boolean expression with given variable assignments.
   """
   defdelegate eval(expr, vars \\ %{}), to: AST
+
+  @doc """
+  Evaluates a list of tokens into a boolean expression AST.
+  """
+  defdelegate parse_expr(tokens), to: Parser
 end
