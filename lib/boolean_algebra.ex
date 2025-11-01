@@ -10,10 +10,8 @@ defmodule BooleanAlgebra do
   """
   defdelegate simplify(expr), to: Simplifier
 
-
   @doc """
   Evaluates a boolean expression with given variable assignments.
   """
   defdelegate eval(expr, vars \\ %{}), to: AST
-
 end

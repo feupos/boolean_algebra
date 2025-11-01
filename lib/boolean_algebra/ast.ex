@@ -54,12 +54,14 @@ defmodule BooleanAlgebra.AST do
   # Exclude default for coverage
   # def eval(expr, vars \\ %{})
   def eval({:const, value}, _vars), do: value
+
   def eval({:var, name}, vars) do
     case Map.fetch(vars, name) do
       {:ok, value} -> value
       :error -> raise ArgumentError, "Variable #{inspect(name)} not found in vars map"
     end
   end
+
   def eval({:not, expr}, vars), do: not eval(expr, vars)
   def eval({:and, left, right}, vars), do: eval(left, vars) and eval(right, vars)
   def eval({:or, left, right}, vars), do: eval(left, vars) or eval(right, vars)
