@@ -51,8 +51,7 @@ defmodule BooleanAlgebra.AST do
   Evaluates the boolean expression with given variable assignments.
   """
   @spec eval(t(), %{String.t() => boolean()}) :: boolean()
-  # Exclude default for coverage
-  # def eval(expr, vars \\ %{})
+  def eval(expr, vars \\ %{})
   def eval({:const, value}, _vars), do: value
 
   def eval({:var, name}, vars) do
