@@ -1,4 +1,4 @@
-defmodule BooleanAlgebraTest do
+defmodule BooleanAlgebraASTTest do
   use ExUnit.Case
   doctest BooleanAlgebra
 
@@ -82,8 +82,8 @@ defmodule BooleanAlgebraTest do
   end
 
   test "eval constant nodes" do
-    assert BooleanAlgebra.eval(AST.const_node(true), %{}) == true
-    assert BooleanAlgebra.eval(AST.const_node(false), %{}) == false
+    assert BooleanAlgebra.eval(AST.const_node(true)) == true
+    assert BooleanAlgebra.eval(AST.const_node(false)) == false
   end
 
   test "complex nested expressions" do
@@ -98,9 +98,9 @@ defmodule BooleanAlgebraTest do
     assert BooleanAlgebra.eval(expr, %{a: true, b: true, c: true}) == false
   end
 
-  test "missing var_nodeiable in context raises error" do
+  test "missing var_node variable in context raises error" do
     assert_raise ArgumentError, fn ->
-      BooleanAlgebra.eval(AST.var_node(:missing), %{a: true})
+      BooleanAlgebra.eval(AST.var_node(:missing))
     end
   end
 end
