@@ -65,4 +65,19 @@ defmodule BooleanAlgebra.AST do
   def eval({:and, left, right}, vars), do: eval(left, vars) and eval(right, vars)
   def eval({:or, left, right}, vars), do: eval(left, vars) or eval(right, vars)
   def eval({:xor, left, right}, vars), do: eval(left, vars) != eval(right, vars)
+
+  @doc """
+  Extracts all variable names from the expression.
+  """
+  def variables(expr), do: variables(expr, MapSet.new()) |> MapSet.to_list()
+
+  defp variables({:var, name}, acc), do: MapSet.put(acc, name)
+  defp variables({:const, _}, acc), do: acc
+  defp variables({:not, expr}, acc), do: variables(expr, acc)
+
+  defp variables({op, left, right}, acc) when op in [:and, :or, :xor, :implies, :equiv] do
+    acc |> variables(left, &variables/2) |> variables(right, &variables/2)
+  end
+
+  defp variables(acc, expr, fun), do: fun.(expr, acc)
 end
