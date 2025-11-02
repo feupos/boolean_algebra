@@ -1,4 +1,3 @@
-
 defmodule BooleanAlgebra.Lexer do
   @moduledoc """
   Parser for boolean expressions from string format.
@@ -76,8 +75,7 @@ defmodule BooleanAlgebra.Lexer do
       "AND" -> {:and, rest}
       "OR" -> {:or, rest}
       "XOR" -> {:xor, rest}
-      id -> {{:var, id}, rest}
+      id -> {{:var, String.to_atom(id)}, rest}
     end
   end
-
 end
