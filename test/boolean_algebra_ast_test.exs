@@ -86,21 +86,32 @@ defmodule BooleanAlgebraASTTest do
     assert AST.eval(AST.const_node(false)) == false
   end
 
-  test "complex nested expressions" do
-    expr =
+  test "complex nested astessions" do
+    ast =
       AST.and_node(
         AST.or_node(AST.var_node(:a), AST.var_node(:b)),
         AST.not_node(AST.var_node(:c))
       )
 
-    assert AST.eval(expr, %{a: true, b: false, c: false}) == true
-    assert AST.eval(expr, %{a: false, b: true, c: false}) == true
-    assert AST.eval(expr, %{a: true, b: true, c: true}) == false
+    assert AST.eval(ast, %{a: true, b: false, c: false}) == true
+    assert AST.eval(ast, %{a: false, b: true, c: false}) == true
+    assert AST.eval(ast, %{a: true, b: true, c: true}) == false
   end
 
   test "missing var_node variable in context raises error" do
     assert_raise ArgumentError, fn ->
       AST.eval(AST.var_node(:missing))
     end
+  end
+
+  test "extract variables from AST" do
+    ast =
+      AST.and_node(
+        AST.or_node(AST.var_node("x"), AST.var_node("y")),
+        AST.xor_node(AST.not_node(AST.var_node("z")), AST.const_node(true))
+      )
+
+    vars = AST.variables(ast)
+    assert Enum.sort(vars) == ["x", "y", "z"]
   end
 end

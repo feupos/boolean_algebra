@@ -30,8 +30,8 @@ defmodule BooleanAlgebraTest do
     vars = %{a: true, b: false, c: true}
 
     for input <- @valid_samples do
-      {:ok, val_original} = BooleanAlgebra.eval(input, vars)
-      {:ok, val_simplified} = BooleanAlgebra.eval(BooleanAlgebra.simplify(input), vars)
+      val_original = BooleanAlgebra.eval(input, vars)
+      val_simplified = BooleanAlgebra.eval(BooleanAlgebra.simplify(input), vars)
 
       assert val_original in [true, false]
       assert val_original == val_simplified
@@ -51,6 +51,24 @@ defmodule BooleanAlgebraTest do
       assert_raise ArgumentError, fn ->
         BooleanAlgebra.eval(input)
       end
+
+      assert_raise ArgumentError, fn ->
+        BooleanAlgebra.truth_table(input)
+      end
+    end
+  end
+
+  test "truth_table returns a list of maps with correct keys" do
+    input = "(a & b) | c"
+    table = BooleanAlgebra.truth_table(input)
+
+    assert is_list(table)
+    assert length(table) == 8
+
+    for row <- table do
+      assert is_map(row)
+      assert Map.keys(row) |> Enum.sort() == [:a, :b, :c, :result]
+      assert row.result in [true, false]
     end
   end
 end

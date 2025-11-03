@@ -3,9 +3,9 @@ defmodule BooleanAlgebra do
   A library for boolean algebra operations
   """
 
-  alias BooleanAlgebra.{AST, Simplifier, Lexer, Parser, Formatter}
-  import Bitwise
+  alias BooleanAlgebra.{AST, Simplifier, Lexer, Parser, Formatter, TruthTable}
 
+  @spec parse(String.t()) :: {:ok, AST.t()} | {:error, String.t()}
   defp parse(input) when is_binary(input) do
     input
     |> Lexer.parse_text()
@@ -15,6 +15,7 @@ defmodule BooleanAlgebra do
   @doc """
   Simplifies a boolean expression.
   """
+  @spec simplify(String.t()) :: String.t()
   def simplify(input) when is_binary(input) do
     input
     |> parse()
@@ -36,7 +37,7 @@ defmodule BooleanAlgebra do
     |> parse()
     |> case do
       {:error, reason} -> raise ArgumentError, message: reason
-      {:ok, ast} -> {:ok, AST.eval(ast, vars)}
+      {:ok, ast} -> AST.eval(ast, vars)
     end
   end
 
@@ -53,22 +54,7 @@ defmodule BooleanAlgebra do
         raise ArgumentError, message: reason
 
       {:ok, ast} ->
-        vars = AST.variables(ast)
-        n = length(vars)
-
-        for i <- 0..(Integer.pow(2, n) - 1) do
-          assignment =
-            vars
-            |> Enum.with_index()
-            |> Enum.map(fn {var, idx} ->
-              bit = i >>> idx &&& 1
-              {var, bit == 1}
-            end)
-            |> Map.new()
-
-          result = AST.eval(ast, assignment)
-          Map.put(assignment, :result, result)
-        end
+        TruthTable.from_ast(ast)
     end
   end
 end
