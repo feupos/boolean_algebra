@@ -40,7 +40,7 @@
             <tr>
               <%= for var <- Map.keys(List.first(@truth_table) || %{}) -- [:result] do %>
                 <th class="px-4 py-2 border border-gray-300 text-left text-sm font-semibold text-gray-700">
-                  <%= to_string(var) %>
+                  {to_string(var)}
                 </th>
               <% end %>
               <th class="px-4 py-2 border border-gray-300 text-left text-sm font-semibold text-gray-700">
@@ -53,20 +53,17 @@
               <tr>
                 <%= for var <- Map.keys(row) -- [:result] do %>
                   <td class="px-4 py-2 border border-gray-300 text-sm text-gray-900">
-                    <%= if row[var], do: "1", else: "0" %>
+                    {if row[var], do: "1", else: "0"}
                   </td>
                 <% end %>
-                <td
-                  class={
-                    [
-                      "some-static-class",
-                      (if List.last(Map.values(row), false),
-                        do: "text-green-600",
-                        else: "text-red-600")
-                    ]
-                  }
-                >
-                  <%= if row[:result], do: "1", else: "0" %>
+                <td class={[
+                  "some-static-class",
+                  if(List.last(Map.values(row), false),
+                    do: "text-green-600",
+                    else: "text-red-600"
+                  )
+                ]}>
+                  {if row[:result], do: "1", else: "0"}
                 </td>
               </tr>
             <% end %>

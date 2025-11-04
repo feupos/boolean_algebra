@@ -6,6 +6,9 @@ defmodule BooleanAlgebraSimplifierTest do
 
   describe "basic expression simplification" do
     test "simplifies OR expressions" do
+      assert Simplifier.simplify(AST.or_node(AST.var_node(:a), AST.var_node(:b))) ==
+               AST.or_node(AST.var_node(:a), AST.var_node(:b))
+
       assert Simplifier.simplify(AST.or_node(AST.var_node(:a), AST.const_node(false))) ==
                AST.var_node(:a)
 
@@ -20,6 +23,9 @@ defmodule BooleanAlgebraSimplifierTest do
     end
 
     test "simplifies AND expressions" do
+      assert Simplifier.simplify(AST.and_node(AST.var_node(:a), AST.var_node(:b))) ==
+               AST.and_node(AST.var_node(:a), AST.var_node(:b))
+
       assert Simplifier.simplify(AST.and_node(AST.var_node(:a), AST.const_node(false))) ==
                AST.const_node(false)
 
@@ -42,6 +48,9 @@ defmodule BooleanAlgebraSimplifierTest do
     end
 
     test "simplifies XOR expressions" do
+      assert Simplifier.simplify(AST.xor_node(AST.var_node(:a), AST.var_node(:b))) ==
+               AST.xor_node(AST.var_node(:a), AST.var_node(:b))
+
       assert Simplifier.simplify(AST.xor_node(AST.var_node(:a), AST.const_node(false))) ==
                AST.var_node(:a)
 

@@ -122,4 +122,6 @@ defmodule BooleanAlgebra.Simplifier do
   defp simplify_xor(left, {:const, true}), do: {:not, left}
   # a XOR a = 0
   defp simplify_xor(left, right) when left == right, do: {:const, false}
+
+  defp simplify_xor(left, right), do: {:xor, left, right}
 end
