@@ -1,0 +1,39 @@
+<div>
+  <h1>Boolean Expression Simplifier & Truth Table</h1>
+
+  <form phx-submit="update_input">
+    <textarea
+      rows="4"
+      cols="50"
+      placeholder="Enter boolean expression"
+      name="expression"
+    ><%= @input %></textarea>
+
+    <button type="submit">Simplify</button>
+  </form>
+
+  <h2>Simplified Expression:</h2>
+  <pre><%= @simplified %></pre>
+
+  <h2>Truth Table</h2>
+  <table border="1">
+    <thead>
+      <tr>
+        <%= for var <- Map.keys(List.first(@truth_table) || %{}) -- [:result] do %>
+          <th><%= to_string(var) %></th>
+        <% end %>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody>
+      <%= for row <- @truth_table do %>
+        <tr>
+          <%= for var <- Map.keys(row) -- [:result] do %>
+            <td><%= row[var] %></td>
+          <% end %>
+          <td><%= row[:result] %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
