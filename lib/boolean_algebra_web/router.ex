@@ -39,7 +39,6 @@ defmodule BooleanAlgebraWeb.Router do
 
       live_dashboard "/dashboard", metrics: BooleanAlgebraWeb.Telemetry
       forward "/mailbox", Plug.Swoosh.MailboxPreview
-
     end
   end
 end

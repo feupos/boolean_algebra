@@ -7,11 +7,16 @@ defmodule BooleanAlgebraWeb.SimplifierLive do
   end
 
   def handle_event("update_input", %{"expression" => expr}, socket) do
-    IO.inspect(expr, label: "Received expression")
     try do
-      {:noreply, assign(socket, input: expr, simplified: BooleanAlgebra.simplify(expr), truth_table: BooleanAlgebra.truth_table(expr))}
+      {:noreply,
+       assign(socket,
+         input: expr,
+         simplified: BooleanAlgebra.simplify(expr),
+         truth_table: BooleanAlgebra.truth_table(expr)
+       )}
     rescue
-      _ -> {:noreply, assign(socket, input: expr, simplified: "Invalid expression", truth_table: [])}
+      _ ->
+        {:noreply, assign(socket, input: expr, simplified: "Invalid expression", truth_table: [])}
     end
   end
 end

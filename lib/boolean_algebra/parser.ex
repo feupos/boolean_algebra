@@ -1,15 +1,6 @@
 defmodule BooleanAlgebra.Parser do
   @moduledoc """
-  Parser for boolean expressions from string format.
-
-  Supported syntax:
-  - Variables: a, b, x, y, etc. (single letters or alphanumeric)
-  - Constants: true, false, 1, 0
-  - NOT: !, ~, NOT
-  - AND: &, &&, AND, *
-  - OR: |, ||, OR, +
-  - XOR: ^, XOR
-  - Parentheses: ()
+  Parser for boolean expressions from tokens.
   """
 
   alias BooleanAlgebra.AST
