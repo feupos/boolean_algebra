@@ -1,6 +1,12 @@
 defmodule BooleanAlgebra.Simplifier do
   @moduledoc """
   Simplifies boolean expressions using boolean algebra laws.
+
+  This minimization procedure is not unique because it lacks specific rules to predict the succeeding step in
+  the manipulative process. So the simplifier applies a set of common simplification rules iteratively and the
+  output will depend on the order of rule application.
+  Although the truth table representation of a Boolean expression is unique, its algebraic
+  expression may be represented by many different forms.
   """
 
   alias BooleanAlgebra.AST

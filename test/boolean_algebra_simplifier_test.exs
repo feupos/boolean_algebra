@@ -257,6 +257,7 @@ defmodule BooleanAlgebraSimplifierTest do
         )
 
       assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
+      assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
     end
 
     test "removes duplicates in multiple nested AND expressions" do
@@ -276,6 +277,7 @@ defmodule BooleanAlgebraSimplifierTest do
         )
 
       assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
+      assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
     end
 
     test "associative flattening and simplification in mixed expressions" do
@@ -295,6 +297,7 @@ defmodule BooleanAlgebraSimplifierTest do
         )
 
       assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
+      assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
     end
 
     test "de morgan's law nested with absorption and duplicates" do
