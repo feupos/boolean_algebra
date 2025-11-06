@@ -52,7 +52,14 @@ defmodule BooleanAlgebra.Parser do
 
   defp parse_unary([{:const, value} | rest]), do: {AST.const_node(value), rest}
   defp parse_unary([{:var, name} | rest]), do: {AST.var_node(name), rest}
-  defp parse_unary([:not, expr | rest]), do: {AST.not_node(expr), rest}
+
+  defp parse_unary([:not | rest]) do
+    case parse_unary(rest) do
+      {:error, _} = error -> error
+      {expr, new_rest} -> {AST.not_node(expr), new_rest}
+    end
+  end
+
   defp parse_unary([]), do: {:error, "Unexpected end of expression"}
 
   # Operator precedence (higher = tighter binding)

@@ -11,13 +11,37 @@ defmodule BooleanAlgebra.Simplifier do
   @spec simplify(AST.t()) :: AST.t()
   def simplify(expr) do
     expr
-    # Apply simplification rules to the expression
+    |> canonicalize()
     |> apply_rules()
     |> case do
-      # If the expression hasn't changed, return it
       ^expr -> expr
-      # Recursively simplify the new expression
       simplified -> simplify(simplified)
+    end
+  end
+
+  # Canonicalization flattens and sorts associative nodes
+  defp canonicalize({:and, left, right}),
+    do: rebuild_op(:and, flatten(:and, left) ++ flatten(:and, right))
+
+  defp canonicalize({:or, left, right}),
+    do: rebuild_op(:or, flatten(:or, left) ++ flatten(:or, right))
+
+  defp canonicalize(expr), do: expr
+
+  # Flatten nested associative nodes and canonicalize operands
+  defp flatten(op, {operator, left, right}) when operator == op do
+    flatten(op, left) ++ flatten(op, right)
+  end
+
+  defp flatten(_op, expr), do: [canonicalize(expr)]
+
+  # Remove duplicates and sort operands for commutative ops
+  defp rebuild_op(op, operands) do
+    norm = operands |> Enum.uniq() |> Enum.sort()
+
+    case norm do
+      [single] -> single
+      _ -> Enum.reduce(norm, fn x, acc -> {op, acc, x} end)
     end
   end
 

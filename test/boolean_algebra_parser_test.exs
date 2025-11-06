@@ -86,6 +86,17 @@ defmodule BooleanAlgebraParserTest do
                  {:var, "z"},
                  :rparen
                ])
+
+      assert {:ok, AST.not_node(AST.or_node(AST.var_node("x"), AST.not_node(AST.var_node("y"))))} ==
+               Parser.parse_tokens([
+                 :not,
+                 :lparen,
+                 {:var, "x"},
+                 :or,
+                 :not,
+                 {:var, "y"},
+                 :rparen
+               ])
     end
 
     test "handles precedence in expressions" do

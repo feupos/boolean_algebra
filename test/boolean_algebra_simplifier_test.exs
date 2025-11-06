@@ -2,10 +2,15 @@ defmodule BooleanAlgebraSimplifierTest do
   use ExUnit.Case
   doctest BooleanAlgebra
 
-  alias BooleanAlgebra.{AST, Simplifier}
+  alias BooleanAlgebra.{AST, Simplifier, TruthTable}
 
   describe "basic expression simplification" do
     test "simplifies OR expressions" do
+      assert Simplifier.simplify(
+               AST.or_node(AST.var_node(:a), AST.or_node(AST.var_node(:b), AST.var_node(:a)))
+             ) ==
+               AST.or_node(AST.var_node(:a), AST.var_node(:b))
+
       assert Simplifier.simplify(AST.or_node(AST.var_node(:a), AST.var_node(:b))) ==
                AST.or_node(AST.var_node(:a), AST.var_node(:b))
 
@@ -231,6 +236,101 @@ defmodule BooleanAlgebraSimplifierTest do
       assert Simplifier.simplify(expr1) == AST.var_node(:a)
       assert Simplifier.simplify(expr2) == AST.var_node(:a)
       assert Simplifier.simplify(expr3) == AST.var_node(:b)
+    end
+  end
+
+  describe "advanced expression simplification" do
+    test "removes duplicates in multiple nested OR expressions" do
+      expr =
+        AST.or_node(
+          AST.var_node(:a),
+          AST.or_node(
+            AST.var_node(:b),
+            AST.or_node(AST.var_node(:a), AST.var_node(:c))
+          )
+        )
+
+      expected =
+        AST.or_node(
+          AST.var_node(:a),
+          AST.or_node(AST.var_node(:b), AST.var_node(:c))
+        )
+
+      assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
+    end
+
+    test "removes duplicates in multiple nested AND expressions" do
+      expr =
+        AST.and_node(
+          AST.var_node(:a),
+          AST.and_node(
+            AST.var_node(:b),
+            AST.and_node(AST.var_node(:a), AST.var_node(:c))
+          )
+        )
+
+      expected =
+        AST.and_node(
+          AST.var_node(:a),
+          AST.and_node(AST.var_node(:b), AST.var_node(:c))
+        )
+
+      assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
+    end
+
+    test "associative flattening and simplification in mixed expressions" do
+      expr =
+        AST.or_node(
+          AST.var_node(:a),
+          AST.or_node(
+            AST.and_node(AST.var_node(:b), AST.const_node(true)),
+            AST.or_node(AST.var_node(:a), AST.const_node(false))
+          )
+        )
+
+      expected =
+        AST.or_node(
+          AST.var_node(:a),
+          AST.var_node(:b)
+        )
+
+      assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
+    end
+
+    test "de morgan's law nested with absorption and duplicates" do
+      expr =
+        AST.not_node(
+          AST.and_node(
+            AST.or_node(AST.var_node(:a), AST.const_node(false)),
+            AST.var_node(:a)
+          )
+        )
+
+      expected =
+        AST.or_node(
+          AST.not_node(AST.var_node(:a)),
+          AST.not_node(AST.var_node(:a))
+        )
+        |> Simplifier.simplify()
+
+      assert Simplifier.simplify(expr) == expected
+      assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
+    end
+
+    test "complex nested negations with absorption and identity" do
+      expr =
+        AST.not_node(
+          AST.or_node(
+            AST.and_node(AST.var_node(:a), AST.var_node(:b)),
+            AST.and_node(AST.var_node(:a), AST.var_node(:b))
+          )
+        )
+
+      expected =
+        AST.or_node(AST.not_node(AST.var_node(:a)), AST.not_node(AST.var_node(:b)))
+
+      assert Simplifier.simplify(expr) == expected
+      assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
     end
   end
 end
