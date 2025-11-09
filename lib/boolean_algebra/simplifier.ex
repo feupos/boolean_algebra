@@ -9,19 +9,81 @@ defmodule BooleanAlgebra.Simplifier do
   expression may be represented by many different forms.
   """
 
-  alias BooleanAlgebra.AST
+  alias BooleanAlgebra.{AST, TruthTable, QMC, Petrick}
 
   @doc """
   Simplifies a boolean expression.
   """
   @spec simplify(AST.t()) :: AST.t()
-  def simplify(expr) do
+  def simplify_old(expr) do
     expr
     |> canonicalize()
     |> apply_rules()
     |> case do
       ^expr -> expr
       simplified -> simplify(simplified)
+    end
+  end
+
+  def simplify(expr), do: simplify_recurse(minimize(expr))
+
+  def simplify_recurse(expr) do
+    expr
+    |> factor_common_terms()
+    |> apply_rules()
+    |> case do
+      ^expr -> expr
+      simplified -> simplify_recurse(simplified)
+    end
+  end
+
+  # Given a Boolean AST, find the minimal expression using QMC and Petrick's method
+  def minimize(expr) do
+    vars = AST.variables(expr)
+    truth_table = TruthTable.from_ast(expr)
+
+    minterms =
+      truth_table
+      |> Enum.with_index()
+      |> Enum.filter(fn {row, _idx} -> Map.get(row, :result) end)
+      |> Enum.map(fn {_row, idx} -> idx end)
+
+    # Handle empty minterms (expression always false)
+    if minterms == [] do
+      {:const, false}
+    else
+      prime_implicants = QMC.minimize(minterms, length(vars))
+      coverage_map = QMC.coverage_table(prime_implicants, minterms, length(vars))
+
+      minimal_covers = Petrick.minimal_cover(coverage_map)
+
+      implicant_set =
+        case minimal_covers do
+          [first_set | _] -> first_set
+          [] -> raise "No minimal covers found"
+        end
+
+      implicant_set
+      |> Enum.map(&implicant_to_ast(&1, vars))
+      |> Enum.reduce(fn ast1, ast2 -> {:or, ast1, ast2} end)
+    end
+  end
+
+  # Convert an implicant pattern (e.g., "1-0") back to AST
+  defp implicant_to_ast(implicant, vars) do
+    literals =
+      String.graphemes(implicant)
+      |> Enum.with_index()
+      |> Enum.reduce([], fn
+        {"1", i}, acc -> [{:var, Enum.at(vars, i)} | acc]
+        {"0", i}, acc -> [{:not, {:var, Enum.at(vars, i)}} | acc]
+        {"-", _i}, acc -> acc
+      end)
+
+    case literals do
+      [] -> {:const, true}
+      [single] -> single
+      _ -> Enum.reduce(literals, fn lit, acc -> {:and, acc, lit} end)
     end
   end
 
@@ -61,6 +123,15 @@ defmodule BooleanAlgebra.Simplifier do
     left = apply_rules(left)
     right = apply_rules(right)
     simplify_and(left, right)
+  end
+
+  # Simplify XOR expressed as OR of ANDs
+  defp apply_rules({:or, {:and, {:not, a}, b}, {:and, {:not, b}, a}}) do
+    simplify_xor(a, b)
+  end
+
+  defp apply_rules({:or, {:and, {:not, a}, b}, {:and, {:not, b}, a}}) do
+    simplify_xor(a, b)
   end
 
   defp apply_rules({:or, left, right}) do
@@ -118,6 +189,15 @@ defmodule BooleanAlgebra.Simplifier do
   defp simplify_and(left, right), do: {:and, left, right}
 
   # OR simplification
+
+  defp simplify_or({:and, a, b}, {:xor, c, d})
+       when (a == c and b == d) or (a == d and b == c),
+       do: simplify_or(a, b)
+
+  defp simplify_or({:xor, a, b}, {:and, c, d})
+       when (a == c and b == d) or (a == d and b == c),
+       do: simplify_or(a, b)
+
   # 1 || a = 1
   defp simplify_or({:const, true}, _), do: {:const, true}
   # a || 1 = 1
@@ -154,4 +234,63 @@ defmodule BooleanAlgebra.Simplifier do
   defp simplify_xor(left, right) when left == right, do: {:const, false}
 
   defp simplify_xor(left, right), do: {:xor, left, right}
+
+  # Factor common terms from OR expressions like a OR (a AND b) = a
+  defp factor_common_terms({:or, left, right}) do
+    # Fully flatten nested OR operands recursively and canonicalize them
+    operands =
+      flatten(:or, {:or, left, right})
+      |> Enum.flat_map(fn
+        {:or, l, r} -> flatten(:or, {:or, l, r})
+        other -> [canonicalize(other)]
+      end)
+      |> Enum.map(&canonicalize/1)
+
+    # Map operands to sets of conjunctive factors
+    conjunctive_sets =
+      Enum.map(operands, fn
+        {:and, _, _} = and_expr -> MapSet.new(flatten(:and, and_expr))
+        operand -> MapSet.new([operand])
+      end)
+
+    # Find common factors among ALL operands
+    common_factors = Enum.reduce(conjunctive_sets, hd(conjunctive_sets), &MapSet.intersection/2)
+
+    if MapSet.size(common_factors) > 0 do
+      # Remove common factors from operands
+      reduced_sets = Enum.map(conjunctive_sets, &MapSet.difference(&1, common_factors))
+
+      # Convert common factors to AST node
+      common_factor_ast = factors_to_ast(common_factors)
+
+      # Convert reduced sets back to AST and rebuild OR expression
+      reduced_ast_operands =
+        Enum.map(reduced_sets, &factors_to_ast/1)
+        |> List.wrap()
+
+      # Factor out common factor and recurse for further factoring
+      {:and, common_factor_ast, rebuild_op(:or, reduced_ast_operands)}
+      |> factor_common_terms()
+    else
+      rebuild_op(:or, operands)
+    end
+  end
+
+  # Recursively factor inside AND nodes and other nodes
+  defp factor_common_terms({:and, left, right}) do
+    left = factor_common_terms(left)
+    right = factor_common_terms(right)
+    rebuild_op(:and, [left, right])
+  end
+
+  defp factor_common_terms(other), do: other
+
+  # Convert MapSet of factors to AST node
+  defp factors_to_ast(factors) do
+    case MapSet.to_list(factors) do
+      [] -> {:const, true}
+      [single] -> single
+      list -> rebuild_op(:and, list)
+    end
+  end
 end

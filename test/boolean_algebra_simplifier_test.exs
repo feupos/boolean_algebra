@@ -252,11 +252,11 @@ defmodule BooleanAlgebraSimplifierTest do
 
       expected =
         AST.or_node(
-          AST.var_node(:a),
-          AST.or_node(AST.var_node(:b), AST.var_node(:c))
+          AST.or_node(AST.var_node(:a), AST.var_node(:b)),
+          AST.var_node(:c)
         )
 
-      assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
+      assert Simplifier.simplify(expr) == expected
       assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
     end
 
@@ -296,7 +296,7 @@ defmodule BooleanAlgebraSimplifierTest do
           AST.var_node(:b)
         )
 
-      assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
+      assert Simplifier.simplify(expr) == expected
       assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
     end
 
@@ -334,6 +334,78 @@ defmodule BooleanAlgebraSimplifierTest do
 
       assert Simplifier.simplify(expr) == expected
       assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
+    end
+  end
+
+  describe "absorption and complex expression tests" do
+    test "simplifies NOT A OR (B OR C) OR (B AND C)" do
+      expr =
+        AST.or_node(
+          AST.or_node(
+            AST.not_node(AST.var_node(:a)),
+            AST.or_node(AST.var_node(:b), AST.var_node(:c))
+          ),
+          AST.and_node(AST.var_node(:b), AST.var_node(:c))
+        )
+
+      # Expected simplification is:
+      # NOT A OR B OR C (since (B AND C) absorbed by (B OR C))
+      expected =
+        AST.or_node(
+          AST.or_node(AST.not_node(AST.var_node(:a)), AST.var_node(:b)),
+          AST.var_node(:c)
+        )
+
+      assert Simplifier.simplify(expr) == expected
+    end
+
+    test "absorption works regardless of operand order" do
+      expr1 =
+        AST.or_node(
+          AST.and_node(AST.var_node(:b), AST.var_node(:c)),
+          AST.or_node(AST.var_node(:b), AST.var_node(:c))
+        )
+
+      expr2 =
+        AST.or_node(
+          AST.or_node(AST.var_node(:b), AST.var_node(:c)),
+          AST.and_node(AST.var_node(:b), AST.var_node(:c))
+        )
+
+      expected =
+        AST.or_node(AST.var_node(:b), AST.var_node(:c))
+
+      assert Simplifier.simplify(expr1) == expected
+      assert Simplifier.simplify(expr2) == expected
+    end
+
+    test "distribution combined with absorption" do
+      expr =
+        AST.and_node(
+          AST.var_node(:a),
+          AST.or_node(AST.var_node(:a), AST.var_node(:b))
+        )
+
+      # By absorption: a AND (a OR b) = a
+      expected = AST.var_node(:a)
+
+      assert Simplifier.simplify(expr) == expected
+    end
+
+    test "double negation simplification in complex OR expressions" do
+      expr =
+        AST.or_node(
+          AST.not_node(AST.not_node(AST.var_node(:a))),
+          AST.and_node(AST.var_node(:b), AST.const_node(true))
+        )
+
+      expected =
+        AST.or_node(
+          AST.var_node(:a),
+          AST.var_node(:b)
+        )
+
+      assert Simplifier.simplify(expr) == expected
     end
   end
 end
