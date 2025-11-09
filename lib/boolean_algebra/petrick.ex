@@ -3,6 +3,8 @@ defmodule BooleanAlgebra.Petrick do
   Petrick's method for selecting minimal prime implicant covers.
   This method finds the minimal combination of prime implicants that covers
   all minterms given a prime implicant coverage table.
+
+  https://www.allaboutcircuits.com/technical-articles/prime-implicant-simplification-using-petricks-method/
   """
 
   @doc """

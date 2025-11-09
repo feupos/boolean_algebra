@@ -2,6 +2,8 @@ defmodule BooleanAlgebra.QMC do
   @moduledoc """
   Quine-McCluskey implementation for Boolean minimization.
 
+  https://www.geeksforgeeks.org/digital-logic/quine-mccluskey-method/
+
   The main function `minimize/2` takes a list of minterms as integers and the number of boolean variables.
   It returns a list of prime implicants expressed as strings using '1', '0', and '-' to represent don't-care bits.
   """
