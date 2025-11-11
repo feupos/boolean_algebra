@@ -29,7 +29,7 @@ defmodule BooleanAlgebraSimplifierTest do
 
     test "simplifies AND expressions" do
       assert Simplifier.simplify(AST.and_node(AST.var_node(:a), AST.var_node(:b))) ==
-               AST.and_node(AST.var_node(:a), AST.var_node(:b))
+               AST.and_node(AST.var_node(:b), AST.var_node(:a))
 
       assert Simplifier.simplify(AST.and_node(AST.var_node(:a), AST.const_node(false))) ==
                AST.const_node(false)
@@ -54,7 +54,7 @@ defmodule BooleanAlgebraSimplifierTest do
 
     test "simplifies XOR expressions" do
       assert Simplifier.simplify(AST.xor_node(AST.var_node(:a), AST.var_node(:b))) ==
-               AST.xor_node(AST.var_node(:a), AST.var_node(:b))
+               AST.xor_node(AST.var_node(:b), AST.var_node(:a))
 
       assert Simplifier.simplify(AST.xor_node(AST.var_node(:a), AST.const_node(false))) ==
                AST.var_node(:a)
@@ -252,8 +252,8 @@ defmodule BooleanAlgebraSimplifierTest do
 
       expected =
         AST.or_node(
-          AST.or_node(AST.var_node(:a), AST.var_node(:b)),
-          AST.var_node(:c)
+          AST.var_node(:a),
+          AST.or_node(AST.var_node(:b), AST.var_node(:c))
         )
 
       assert Simplifier.simplify(expr) == expected
@@ -352,8 +352,8 @@ defmodule BooleanAlgebraSimplifierTest do
       # NOT A OR B OR C (since (B AND C) absorbed by (B OR C))
       expected =
         AST.or_node(
-          AST.or_node(AST.not_node(AST.var_node(:a)), AST.var_node(:b)),
-          AST.var_node(:c)
+          AST.not_node(AST.var_node(:a)),
+          AST.or_node(AST.var_node(:b), AST.var_node(:c))
         )
 
       assert Simplifier.simplify(expr) == expected

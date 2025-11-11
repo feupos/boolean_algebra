@@ -69,7 +69,12 @@ defmodule BooleanAlgebra.AST do
   @doc """
   Extracts all variable names from the expression.
   """
-  def variables(expr), do: variables(expr, MapSet.new()) |> MapSet.to_list()
+  def variables(expr),
+    do:
+      variables(expr, MapSet.new())
+      |> MapSet.to_list()
+      |> Enum.uniq()
+      |> Enum.sort()
 
   defp variables({:var, name}, acc), do: MapSet.put(acc, name)
   defp variables({:const, _}, acc), do: acc
