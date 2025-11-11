@@ -67,7 +67,7 @@ defmodule BooleanAlgebra.Simplifier do
     case literals do
       [] -> {:const, true}
       [single] -> single
-      _ -> Enum.reduce(literals, fn lit, acc -> {:and, acc, lit} end)
+      _ -> Enum.reduce(literals, fn lit, acc -> {:and, lit, acc} end)
     end
   end
 
@@ -77,6 +77,13 @@ defmodule BooleanAlgebra.Simplifier do
 
   defp apply_rules({:or, {:and, {:not, a}, b}, {:and, a, {:not, b}}}),
     do: apply_rules({:xor, a, b})
+
+  defp apply_rules({:or, {:and, a, {:not, b}}, {:and, {:not, a}, b}}),
+    do: apply_rules({:xor, a, b})
+
+  defp apply_rules({:or, {:and, a, {:not, b}}, {:and, b, {:not, a}}}),
+    do: apply_rules({:xor, a, b})
+
 
   defp apply_rules({op, left, right}) when op in [:and, :or, :xor] do
     {op, apply_rules(left), apply_rules(right)}
