@@ -49,31 +49,35 @@ defmodule BooleanAlgebra.QMC do
   end
 
   # Converts bits list to string representation ('1', '0', '-')
-  defp bits_to_string(bits) do
-    Enum.map_join(bits, fn
-      true -> "1"
-      false -> "0"
-      :dash -> "-"
+  defp bits_to_list(bits) do
+    Enum.map(bits, fn
+      true -> true
+      false -> false
+      _ -> :dont_care
     end)
   end
 
-  # Combines two implicants if they differ in exactly one bit, marking that bit as '-'
-  def combine_implicants(imp1, imp2) do
-    bits1 = String.graphemes(imp1)
-    bits2 = String.graphemes(imp2)
+  # Combines two implicants if they differ in exactly one bit, marking that bit as :dont_care.
+  def combine_implicants(imp1, imp2) when is_list(imp1) and is_list(imp2) do
+    result =
+      Enum.zip(imp1, imp2)
+      |> Enum.reduce_while({:not_found, []}, fn
+        # Both are exactly the same (including both :dont_care)
+        {b, b}, {found, acc} ->
+          {:cont, {found, acc ++ [b]}}
 
-    {diff_count, combined_bits} =
-      Enum.zip(bits1, bits2)
-      |> Enum.reduce({0, []}, fn
-        {b, b}, {count, acc} -> {count, acc ++ [b]}
-        {_b1, _b2}, {0, acc} -> {1, acc ++ ["-"]}
-        {_b1, _b2}, {count, acc} -> {count + 10, acc}
+        # First bit difference (both must be concrete booleans)
+        {b1, b2}, {:not_found, acc} when is_boolean(b1) and is_boolean(b2) ->
+          {:cont, {:found, acc ++ [:dont_care]}}
+
+        # Second bit difference - stop immediately
+        {_b1, _b2}, {_count, _acc} ->
+          {:halt, :too_many_diffs}
       end)
 
-    if diff_count == 1 do
-      {:ok, Enum.join(combined_bits)}
-    else
-      :error
+    case result do
+      {:found, combined_bits} -> {:ok, combined_bits}
+      _ -> :error
     end
   end
 
@@ -124,8 +128,8 @@ defmodule BooleanAlgebra.QMC do
       {found_merge, new_mergeds} =
         Enum.reduce(group2, {false, []}, fn implicant2, {found, acc} ->
           case combine_implicants(
-                 to_implicant_string(implicant1, num_vars),
-                 to_implicant_string(implicant2, num_vars)
+                 to_implicant_list(implicant1, num_vars),
+                 to_implicant_list(implicant2, num_vars)
                ) do
             {:ok, combined} -> {true, [combined | acc]}
             :error -> {found, acc}
@@ -140,38 +144,39 @@ defmodule BooleanAlgebra.QMC do
     end)
   end
 
-  defp to_implicant_string(implicant, num_vars) when is_integer(implicant),
-    do: bits_to_string(int_to_bits(implicant, num_vars))
+  defp to_implicant_list(implicant, num_vars) when is_integer(implicant),
+    do: bits_to_list(int_to_bits(implicant, num_vars))
 
-  defp to_implicant_string(implicant, _num_vars) when is_binary(implicant), do: implicant
+  defp to_implicant_list(implicant, _num_vars) when is_list(implicant), do: implicant
 
   # Regroup merged implicants by number of 1s (ignoring '-' bits)
   defp regroup_by_ones(implicants_map) do
     implicants_map
     |> Map.values()
-    |> List.flatten()
-    |> Enum.group_by(&count_ones_in_string/1)
+    |> Enum.concat()
+    |> Enum.group_by(&count_ones_in_list/1)
   end
 
-  defp count_ones_in_string(implicant_str) do
-    String.graphemes(implicant_str)
-    |> Enum.count(fn c -> c == "1" end)
+  defp count_ones_in_list(implicant_list) do
+    Enum.count(implicant_list, fn c -> c == true end)
   end
 
   @doc """
-  Given prime implicants (strings) and a list of minterms,
+  Given prime implicants and a list of minterms,
   build a coverage map from minterms to implicants covering them.
   """
   def coverage_table(prime_implicants, minterms, num_vars) do
-    prime_implicants_str =
+    prime_implicants_list =
       Enum.map(prime_implicants, fn
-        s when is_binary(s) -> s
-        n when is_integer(n) -> bits_to_string(int_to_bits(n, num_vars))
+        implicant when is_list(implicant) -> implicant
+        n when is_integer(n) -> bits_to_list(int_to_bits(n, num_vars))
       end)
 
     Enum.reduce(minterms, %{}, fn minterm, acc ->
       implicants_covering =
-        Enum.filter(prime_implicants_str, fn implicant -> covers_minterm?(implicant, minterm) end)
+        Enum.filter(prime_implicants_list, fn implicant ->
+          covers_minterm?(implicant, minterm, num_vars)
+        end)
 
       Map.put(acc, minterm, implicants_covering)
     end)
@@ -179,13 +184,13 @@ defmodule BooleanAlgebra.QMC do
 
   # Check if implicant covers the minterm; implicant is string like "1-0",
   # minterm is integer, convert minterm to bitstring for comparison
-  defp covers_minterm?(implicant, minterm) do
-    bits = bits_to_string(int_to_bits(minterm, String.length(implicant)))
+  defp covers_minterm?(implicant, minterm, num_vars) when is_list(implicant) do
+    bits = bits_to_list(int_to_bits(minterm, num_vars))
 
-    Enum.zip(String.graphemes(implicant), String.graphemes(bits))
+    Enum.zip(implicant, bits)
     |> Enum.all?(fn
-      {"-", _bit} -> true
-      {char, bit} -> char == bit
+      {:dont_care, _bit} -> true
+      {val, bit} -> val == bit
     end)
   end
 end

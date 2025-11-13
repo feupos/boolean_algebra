@@ -53,15 +53,15 @@ defmodule BooleanAlgebra.Simplifier do
     end
   end
 
-  # Convert an implicant pattern (e.g., "1-0") back to AST
-  defp implicant_to_ast(implicant, vars) do
+  # Convert an implicant pattern (e.g., [true, :dont_care, false]) back to AST
+  defp implicant_to_ast(implicant, vars) when is_list(implicant) do
     literals =
-      String.graphemes(implicant)
+      implicant
       |> Enum.with_index()
       |> Enum.reduce([], fn
-        {"1", i}, acc -> [{:var, Enum.at(vars, i)} | acc]
-        {"0", i}, acc -> [{:not, {:var, Enum.at(vars, i)}} | acc]
-        {"-", _i}, acc -> acc
+        {true, i}, acc -> [{:var, Enum.at(vars, i)} | acc]
+        {false, i}, acc -> [{:not, {:var, Enum.at(vars, i)}} | acc]
+        {:dont_care, _i}, acc -> acc
       end)
 
     case literals do
@@ -83,7 +83,6 @@ defmodule BooleanAlgebra.Simplifier do
 
   defp apply_rules({:or, {:and, a, {:not, b}}, {:and, b, {:not, a}}}),
     do: apply_rules({:xor, a, b})
-
 
   defp apply_rules({op, left, right}) when op in [:and, :or, :xor] do
     {op, apply_rules(left), apply_rules(right)}
