@@ -2,7 +2,8 @@ defmodule BooleanAlgebraSimplifierTest do
   use ExUnit.Case
   doctest BooleanAlgebra
 
-  alias BooleanAlgebra.{AST, Simplifier, TruthTable} #, QMC, Petrick}
+  # , QMC, Petrick}
+  alias BooleanAlgebra.{AST, Simplifier, TruthTable}
 
   describe "basic expression simplification" do
     test "simplifies OR expressions" do

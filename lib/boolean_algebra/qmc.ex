@@ -117,6 +117,7 @@ defmodule BooleanAlgebra.QMC do
 
       # Check if last group had a next_group to compare with
       has_next = Map.has_key?(grouped, last_key + 1)
+
       unused_from_this_iteration =
         if has_next do
           unused_from_this_iteration
@@ -146,7 +147,6 @@ defmodule BooleanAlgebra.QMC do
       end
     end
   end
-
 
   # Compare and merge two groups of implicants
   # Returns {merged group, whether any merge occurred, unmerged implicants}

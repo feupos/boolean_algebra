@@ -11,7 +11,11 @@ defmodule BooleanAlgebra.MixProject do
       aliases: aliases(),
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
-      listeners: [Phoenix.CodeReloader]
+      listeners: [Phoenix.CodeReloader],
+      test_coverage: [
+        tool: ExCoveralls,
+        threshold: 50
+      ]
     ]
   end
 
@@ -27,7 +31,14 @@ defmodule BooleanAlgebra.MixProject do
 
   def cli do
     [
-      preferred_envs: [precommit: :test]
+      preferred_envs: [precommit: :test],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test,
+        "coveralls.json": :test
+      ]
     ]
   end
 
@@ -40,6 +51,7 @@ defmodule BooleanAlgebra.MixProject do
   # Type `mix help deps` for examples and options.
   defp deps do
     [
+      {:excoveralls, "~> 0.18", only: [:test]},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:phoenix, "~> 1.8.1"},
       {:phoenix_html, "~> 4.1"},
