@@ -2,7 +2,7 @@ defmodule BooleanAlgebraSimplifierTest do
   use ExUnit.Case
   doctest BooleanAlgebra
 
-  alias BooleanAlgebra.{AST, Simplifier, TruthTable}
+  alias BooleanAlgebra.{AST, Simplifier, TruthTable} #, QMC, Petrick}
 
   describe "basic expression simplification" do
     test "simplifies OR expressions" do
@@ -405,6 +405,58 @@ defmodule BooleanAlgebraSimplifierTest do
           AST.var_node(:b)
         )
 
+      assert Simplifier.simplify(expr) == expected
+    end
+  end
+
+  describe "5-variable simplification" do
+    # Example from https://math.stackexchange.com/questions/412941/boolean-simplification-5-variables
+    @tag :slow
+    test "simplifies (xyz+uv)*((x+!y+!z)+uv) to xyz+uv" do
+      x = AST.var_node(:x)
+      y = AST.var_node(:y)
+      z = AST.var_node(:z)
+      u = AST.var_node(:u)
+      v = AST.var_node(:v)
+      xyz = AST.and_node(x, AST.and_node(y, z))
+      uv = AST.and_node(u, v)
+      left_term = AST.or_node(xyz, uv)
+      not_y = AST.not_node(y)
+      not_z = AST.not_node(z)
+      x_or_not_y_or_not_z = AST.or_node(x, AST.or_node(not_y, not_z))
+      right_term = AST.or_node(x_or_not_y_or_not_z, uv)
+      expr = AST.and_node(left_term, right_term)
+
+      # Debug: Check the truth table
+      # truth_table = TruthTable.from_ast(expr)
+      # vars = AST.variables(expr)
+      # IO.puts("Variables: #{inspect(vars)}")
+      # IO.puts("Number of variables: #{length(vars)}")
+
+      # minterms =
+      #   truth_table
+      #     |> Enum.with_index()
+      #     |> Enum.filter(fn {row, _idx} -> Map.get(row, :result) end)
+      #     |> Enum.map(fn {_row, idx} -> idx end)
+
+      # IO.puts("Minterms: #{inspect(minterms)}")
+      # IO.puts("Number of minterms: #{length(minterms)}")
+
+      # # Run QMC
+      # prime_implicants = QMC.minimize(minterms, length(vars))
+      # IO.puts("Prime implicants: #{inspect(prime_implicants)}")
+
+      # # Build coverage table
+      # coverage_map = QMC.coverage_table(prime_implicants, minterms, length(vars))
+      # IO.puts("Coverage map: #{inspect(coverage_map)}")
+
+      # # Try Petrick
+      # minimal_covers = Petrick.minimal_cover(coverage_map)
+      # IO.puts("Minimal covers: #{inspect(minimal_covers)}")
+
+      # Now try the actual simplification
+      expected = AST.or_node(uv, xyz)
+      assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
       assert Simplifier.simplify(expr) == expected
     end
   end

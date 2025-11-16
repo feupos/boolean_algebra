@@ -5,15 +5,17 @@ defmodule BooleanAlgebra.Petrick do
   all minterms given a prime implicant coverage table.
 
   https://www.allaboutcircuits.com/technical-articles/prime-implicant-simplification-using-petricks-method/
+  https://www.youtube.com/watch?v=EkgPsTH4kLU
+  https://math.stackexchange.com/questions/970056/how-should-i-think-when-implementing-patricks-method
   """
 
   @doc """
   Finds the minimal covers of a Boolean function given a prime implicant coverage table.
 
   The `prime_implicant_table` parameter should be a map where keys are minterm integers,
-  and values are lists of prime implicant identifiers (strings) that cover the minterm.
+  and values are lists of prime implicants that cover the minterm.
 
-  Returns a list of minimal sets (each set is a list of implicants) covering all minterms.
+  Returns a list of minimal sets (each set is a list of implicants like [true, false, :dont_care]) covering all minterms.
   """
   def minimal_cover(prime_implicant_table) when is_map(prime_implicant_table) do
     prime_implicant_table
