@@ -22,7 +22,7 @@ defmodule BooleanAlgebra.QMC do
     prime_implicants
   end
 
-  def minimize([], _num_vars), do: []
+
 
   @doc """
   Groups minterms by the number of 1-bits they contain.
@@ -78,19 +78,14 @@ defmodule BooleanAlgebra.QMC do
 
   Returns {prime_implicants, unused}.
   """
-  def find_prime_implicants(grouped, _num_vars) when map_size(grouped) == 0 do
-    {[], []}
-  end
+
 
   def find_prime_implicants(grouped, num_vars) do
-    if map_size(grouped) == 0 do
-      {[], []}
-    else
-      group_keys = Map.keys(grouped) |> Enum.sort()
+    group_keys = Map.keys(grouped) |> Enum.sort()
 
-      # Try to merge groups
-      {next_groups, unused_from_this_iteration} =
-        Enum.reduce(group_keys, {%{}, []}, fn key, {acc_groups, unused_acc} ->
+    # Try to merge groups
+    {next_groups, unused_from_this_iteration} =
+      Enum.reduce(group_keys, {%{}, []}, fn key, {acc_groups, unused_acc} ->
           current_group = Map.get(grouped, key, [])
           next_group = Map.get(grouped, key + 1, [])
 
@@ -110,21 +105,6 @@ defmodule BooleanAlgebra.QMC do
             {acc_groups, unused_acc ++ converted_unmerged}
           end
         end)
-
-      # Also add the last group if it wasn't processed
-      last_key = Enum.max(group_keys)
-      last_group_items = Map.get(grouped, last_key, [])
-
-      # Check if last group had a next_group to compare with
-      has_next = Map.has_key?(grouped, last_key + 1)
-
-      unused_from_this_iteration =
-        if has_next do
-          unused_from_this_iteration
-        else
-          converted_last = Enum.map(last_group_items, &to_implicant_list(&1, num_vars))
-          unused_from_this_iteration ++ converted_last
-        end
 
       # If we generated new merged groups, recurse
       if map_size(next_groups) > 0 do
@@ -146,7 +126,7 @@ defmodule BooleanAlgebra.QMC do
         {all_primes, []}
       end
     end
-  end
+
 
   # Compare and merge two groups of implicants
   # Returns {merged group, whether any merge occurred, unmerged implicants}
@@ -194,10 +174,7 @@ defmodule BooleanAlgebra.QMC do
   """
   def coverage_table(prime_implicants, minterms, num_vars) do
     prime_implicants_list =
-      Enum.map(prime_implicants, fn
-        implicant when is_list(implicant) -> implicant
-        n when is_integer(n) -> int_to_bits(n, num_vars)
-      end)
+      Enum.map(prime_implicants, fn implicant -> implicant end)
 
     Enum.reduce(minterms, %{}, fn minterm, acc ->
       implicants_covering =
