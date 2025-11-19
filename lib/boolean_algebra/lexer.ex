@@ -15,13 +15,13 @@ defmodule BooleanAlgebra.Lexer do
   @doc """
   Parses a boolean expression string into tokens.
   """
-  def parse_text(input) when is_binary(input) do
+  def tokenize(input) when is_binary(input) do
     input
-    |> tokenize()
+    |> prepare_input()
   end
 
   # Tokenize input preserving spacing and splitting operators/parentheses
-  defp tokenize(input) do
+  defp prepare_input(input) do
     input
     |> String.trim()
     # Add spaces around operators and parentheses for splitting

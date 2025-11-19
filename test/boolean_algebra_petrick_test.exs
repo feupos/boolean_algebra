@@ -11,17 +11,15 @@ defmodule BooleanAlgebra.PetrickTest do
 
     result = Petrick.minimal_cover(table)
 
-    # Expect exact output (order matters if Petrick produces deterministic order)
+    # Expected minimal covers: {P1, P2}, {P1, P3}, {P2, P3}
+    # P1=[F,F], P2=[F,T], P3=[T,F]
     expected = [
       [[false, false], [false, true]],
-      [[false, false], [false, true]],
-      [[false, true], [true, false]],
-      [[false, false], [true, false]],
       [[false, false], [true, false]],
       [[false, true], [true, false]]
     ]
 
-    assert result == expected
+    assert sort_covers(result) == sort_covers(expected)
   end
 
   test "minimal_cover handles single implicant per minterm" do
@@ -37,7 +35,7 @@ defmodule BooleanAlgebra.PetrickTest do
       [[false, false, true], [false, true, false], [true, false, false]]
     ]
 
-    assert result == expected
+    assert sort_covers(result) == sort_covers(expected)
   end
 
   test "minimal_cover handles full coverage by single implicant" do
@@ -51,7 +49,7 @@ defmodule BooleanAlgebra.PetrickTest do
 
     expected = [[[:dont_care, :dont_care]]]
 
-    assert result == expected
+    assert sort_covers(result) == sort_covers(expected)
   end
 
   test "minimal_cover with realistic QMC output" do
@@ -68,10 +66,16 @@ defmodule BooleanAlgebra.PetrickTest do
       [[:dont_care, false, true], [false, :dont_care, false]]
     ]
 
-    assert result == expected
+    assert sort_covers(result) == sort_covers(expected)
   end
   
   test "minimal_cover handles empty map" do
     assert Petrick.minimal_cover(%{}) == []
+  end
+
+  defp sort_covers(covers) do
+    covers
+    |> Enum.map(fn cover -> Enum.sort(cover) end)
+    |> Enum.sort()
   end
 end

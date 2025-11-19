@@ -7,41 +7,41 @@ defmodule BooleanAlgebraParserTest do
 
   describe "test parsing of tokens into expressions" do
     test "parses simple constants" do
-      assert {:ok, AST.const_node(true)} == Parser.parse_tokens([{:const, true}])
-      assert {:ok, AST.const_node(false)} == Parser.parse_tokens([{:const, false}])
+      assert {:ok, AST.const_node(true)} == Parser.parse([{:const, true}])
+      assert {:ok, AST.const_node(false)} == Parser.parse([{:const, false}])
     end
 
     test "parses simple variables" do
-      assert {:ok, AST.var_node("x")} == Parser.parse_tokens([{:var, "x"}])
+      assert {:ok, AST.var_node("x")} == Parser.parse([{:var, "x"}])
     end
 
     test "parses NOT expressions" do
       assert {:ok, AST.not_node(AST.var_node("x"))} ==
-               Parser.parse_tokens([:not, {:var, "x"}])
+               Parser.parse([:not, {:var, "x"}])
     end
 
     test "parses AND expressions" do
       assert {:ok, AST.and_node(AST.var_node("x"), AST.var_node("y"))} ==
-               Parser.parse_tokens([{:var, "x"}, :and, {:var, "y"}])
+               Parser.parse([{:var, "x"}, :and, {:var, "y"}])
     end
 
     test "parses OR expressions" do
       assert {:ok, AST.or_node(AST.var_node("x"), AST.var_node("y"))} ==
-               Parser.parse_tokens([{:var, "x"}, :or, {:var, "y"}])
+               Parser.parse([{:var, "x"}, :or, {:var, "y"}])
     end
 
     test "parses XOR expressions" do
       assert {:ok, AST.xor_node(AST.var_node("x"), AST.var_node("y"))} ==
-               Parser.parse_tokens([{:var, "x"}, :xor, {:var, "y"}])
+               Parser.parse([{:var, "x"}, :xor, {:var, "y"}])
     end
 
     test "handles parentheses" do
       assert {:ok, AST.and_node(AST.var_node("x"), AST.var_node("y"))} ==
-               Parser.parse_tokens([:lparen, {:var, "x"}, :and, {:var, "y"}, :rparen])
+               Parser.parse([:lparen, {:var, "x"}, :and, {:var, "y"}, :rparen])
 
       assert {:ok,
               AST.or_node(AST.and_node(AST.var_node("x"), AST.var_node("y")), AST.var_node("z"))} ==
-               Parser.parse_tokens([
+               Parser.parse([
                  :lparen,
                  {:var, "x"},
                  :and,
@@ -53,7 +53,7 @@ defmodule BooleanAlgebraParserTest do
 
       assert {:ok,
               AST.and_node(AST.var_node("x"), AST.or_node(AST.var_node("y"), AST.var_node("z")))} ==
-               Parser.parse_tokens([
+               Parser.parse([
                  {:var, "x"},
                  :and,
                  :lparen,
@@ -65,7 +65,7 @@ defmodule BooleanAlgebraParserTest do
 
       assert {:ok,
               AST.and_node(AST.or_node(AST.var_node("x"), AST.var_node("y")), AST.var_node("z"))} ==
-               Parser.parse_tokens([
+               Parser.parse([
                  :lparen,
                  {:var, "x"},
                  :or,
@@ -77,7 +77,7 @@ defmodule BooleanAlgebraParserTest do
 
       assert {:ok,
               AST.or_node(AST.var_node("x"), AST.and_node(AST.var_node("y"), AST.var_node("z")))} ==
-               Parser.parse_tokens([
+               Parser.parse([
                  {:var, "x"},
                  :or,
                  :lparen,
@@ -88,7 +88,7 @@ defmodule BooleanAlgebraParserTest do
                ])
 
       assert {:ok, AST.not_node(AST.or_node(AST.var_node("x"), AST.not_node(AST.var_node("y"))))} ==
-               Parser.parse_tokens([
+               Parser.parse([
                  :not,
                  :lparen,
                  {:var, "x"},
@@ -102,18 +102,18 @@ defmodule BooleanAlgebraParserTest do
     test "handles precedence in expressions" do
       assert {:ok,
               AST.or_node(AST.and_node(AST.var_node("x"), AST.var_node("y")), AST.var_node("z"))} ==
-               Parser.parse_tokens([{:var, "x"}, :and, {:var, "y"}, :or, {:var, "z"}])
+               Parser.parse([{:var, "x"}, :and, {:var, "y"}, :or, {:var, "z"}])
     end
 
     test "returns error for invalid expressions" do
       assert {:error, "Missing closing parenthesis"} =
-               Parser.parse_tokens([:lparen, {:var, "x"}])
+               Parser.parse([:lparen, {:var, "x"}])
 
       assert {:error, "Unexpected end of expression"} =
-               Parser.parse_tokens([{:var, "x"}, :and])
+               Parser.parse([{:var, "x"}, :and])
 
       assert {:error, "Unexpected tokens at end"} =
-               Parser.parse_tokens([{:var, "x"}, :invalid_token])
+               Parser.parse([{:var, "x"}, :invalid_token])
     end
   end
 end

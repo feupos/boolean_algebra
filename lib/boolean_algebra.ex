@@ -8,8 +8,8 @@ defmodule BooleanAlgebra do
   @spec parse(String.t()) :: {:ok, AST.t()} | {:error, String.t()}
   defp parse(input) when is_binary(input) do
     input
-    |> Lexer.parse_text()
-    |> Parser.parse_tokens()
+    |> Lexer.tokenize()
+    |> Parser.parse()
   end
 
   @doc """

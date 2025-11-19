@@ -6,7 +6,7 @@ defmodule BooleanAlgebra.Parser do
   alias BooleanAlgebra.AST
 
   # Parsing with precedence climbing
-  def parse_tokens(tokens) do
+  def parse(tokens) do
     case parse_precedence(tokens, 0) do
       {:error, _} = error -> error
       {expr, []} -> {:ok, expr}

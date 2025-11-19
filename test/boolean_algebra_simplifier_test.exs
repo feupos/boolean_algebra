@@ -410,6 +410,150 @@ defmodule BooleanAlgebraSimplifierTest do
     end
   end
 
+  describe "Standard Boolean Algebra Laws and Theorems" do
+    # Reference: https://www.electronics-tutorials.ws/boolean/bool_6.html
+
+    test "Consensus Theorem: AB + !AC + BC = AB + !AC" do
+      # The term BC is redundant because if A is true, B must be true (from AB),
+      # and if A is false, C must be true (from !AC).
+      expr =
+        AST.or_node(
+          AST.or_node(
+            AST.and_node(AST.var_node(:a), AST.var_node(:b)),
+            AST.and_node(AST.not_node(AST.var_node(:a)), AST.var_node(:c))
+          ),
+          AST.and_node(AST.var_node(:b), AST.var_node(:c))
+        )
+
+      expected =
+        AST.or_node(
+          AST.and_node(AST.var_node(:a), AST.var_node(:b)),
+          AST.and_node(AST.not_node(AST.var_node(:a)), AST.var_node(:c))
+        )
+
+      assert Simplifier.simplify(expr) == expected
+    end
+
+    test "Distributive Law (Reverse): (A + B)(A + C) = A + BC" do
+      expr =
+        AST.and_node(
+          AST.or_node(AST.var_node(:a), AST.var_node(:b)),
+          AST.or_node(AST.var_node(:a), AST.var_node(:c))
+        )
+
+      expected =
+        AST.or_node(
+          AST.var_node(:a),
+          AST.and_node(AST.var_node(:b), AST.var_node(:c))
+        )
+
+      assert Simplifier.simplify(expr) == expected
+    end
+
+    test "Redundancy Law: A + !AB = A + B" do
+      expr =
+        AST.or_node(
+          AST.var_node(:a),
+          AST.and_node(AST.not_node(AST.var_node(:a)), AST.var_node(:b))
+        )
+
+      expected = AST.or_node(AST.var_node(:a), AST.var_node(:b))
+
+      assert Simplifier.simplify(expr) == expected
+    end
+
+    test "Redundancy Law (Dual): A(!A + B) = AB" do
+      expr =
+        AST.and_node(
+          AST.var_node(:a),
+          AST.or_node(AST.not_node(AST.var_node(:a)), AST.var_node(:b))
+        )
+
+      expected = AST.and_node(AST.var_node(:a), AST.var_node(:b))
+
+      assert Simplifier.simplify(expr) == expected
+    end
+
+    test "Absorption Law: A(A + B) = A" do
+      expr =
+        AST.and_node(
+          AST.var_node(:a),
+          AST.or_node(AST.var_node(:a), AST.var_node(:b))
+        )
+
+      expected = AST.var_node(:a)
+
+      assert Simplifier.simplify(expr) == expected
+    end
+
+    test "Simplification of (A + B)(A + !B) = A" do
+      expr =
+        AST.and_node(
+          AST.or_node(AST.var_node(:a), AST.var_node(:b)),
+          AST.or_node(AST.var_node(:a), AST.not_node(AST.var_node(:b)))
+        )
+
+      expected = AST.var_node(:a)
+
+      assert Simplifier.simplify(expr) == expected
+    end
+
+    test "Dual Consensus Theorem: (A + B)(!A + C)(B + C) = (A + B)(!A + C)" do
+      # Reference: https://www.geeksforgeeks.org/consensus-theorem-in-digital-logic/
+      expr =
+        AST.and_node(
+          AST.and_node(
+            AST.or_node(AST.var_node(:a), AST.var_node(:b)),
+            AST.or_node(AST.not_node(AST.var_node(:a)), AST.var_node(:c))
+          ),
+          AST.or_node(AST.var_node(:b), AST.var_node(:c))
+        )
+
+      expected =
+        AST.and_node(
+          AST.or_node(AST.var_node(:a), AST.var_node(:b)),
+          AST.or_node(AST.not_node(AST.var_node(:a)), AST.var_node(:c))
+        )
+
+      assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
+    end
+
+    test "Transposition Theorem: AB + !AC = (A + C)(!A + B)" do
+      # Reference: https://www.tutorialspoint.com/digital_circuits/digital_circuits_boolean_algebra.htm
+      # Note: The simplifier might prefer SOP form (AB + !AC) over POS ((A+C)(!A+B)).
+      # So we check if simplifying the POS form results in the SOP form.
+      expr_pos =
+        AST.and_node(
+          AST.or_node(AST.var_node(:a), AST.var_node(:c)),
+          AST.or_node(AST.not_node(AST.var_node(:a)), AST.var_node(:b))
+        )
+
+      expected_sop =
+        AST.or_node(
+          AST.and_node(AST.var_node(:a), AST.var_node(:b)),
+          AST.and_node(AST.not_node(AST.var_node(:a)), AST.var_node(:c))
+        )
+
+      assert Simplifier.simplify(expr_pos) == expected_sop
+    end
+
+    test "Complex Simplification: AB + A(B + C) + B(B + C) = B + AC" do
+      # AB + AB + AC + B + BC = AB + AC + B = B + AC
+      expr =
+        AST.or_node(
+          AST.or_node(
+            AST.and_node(AST.var_node(:a), AST.var_node(:b)),
+            AST.and_node(AST.var_node(:a), AST.or_node(AST.var_node(:b), AST.var_node(:c)))
+          ),
+          AST.and_node(AST.var_node(:b), AST.or_node(AST.var_node(:b), AST.var_node(:c)))
+        )
+
+      expected = AST.or_node(AST.and_node(AST.var_node(:a), AST.var_node(:c)), AST.var_node(:b))
+
+      assert Simplifier.simplify(expr) == expected
+    end
+  end
+
   describe "5-variable simplification" do
     # Example from https://math.stackexchange.com/questions/412941/boolean-simplification-5-variables
     @tag :slow
@@ -427,33 +571,6 @@ defmodule BooleanAlgebraSimplifierTest do
       x_or_not_y_or_not_z = AST.or_node(x, AST.or_node(not_y, not_z))
       right_term = AST.or_node(x_or_not_y_or_not_z, uv)
       expr = AST.and_node(left_term, right_term)
-
-      # Debug: Check the truth table
-      # truth_table = TruthTable.from_ast(expr)
-      # vars = AST.variables(expr)
-      # IO.puts("Variables: #{inspect(vars)}")
-      # IO.puts("Number of variables: #{length(vars)}")
-
-      # minterms =
-      #   truth_table
-      #     |> Enum.with_index()
-      #     |> Enum.filter(fn {row, _idx} -> Map.get(row, :result) end)
-      #     |> Enum.map(fn {_row, idx} -> idx end)
-
-      # IO.puts("Minterms: #{inspect(minterms)}")
-      # IO.puts("Number of minterms: #{length(minterms)}")
-
-      # # Run QMC
-      # prime_implicants = QMC.minimize(minterms, length(vars))
-      # IO.puts("Prime implicants: #{inspect(prime_implicants)}")
-
-      # # Build coverage table
-      # coverage_map = QMC.coverage_table(prime_implicants, minterms, length(vars))
-      # IO.puts("Coverage map: #{inspect(coverage_map)}")
-
-      # # Try Petrick
-      # minimal_covers = Petrick.minimal_cover(coverage_map)
-      # IO.puts("Minimal covers: #{inspect(minimal_covers)}")
 
       # Now try the actual simplification
       expected = AST.or_node(uv, xyz)
