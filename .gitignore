@@ -21,3 +21,6 @@ boolean_algebra-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Elixir language server directory
+/.elixir_ls/
