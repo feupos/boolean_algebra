@@ -68,7 +68,7 @@ defmodule BooleanAlgebra.PetrickTest do
 
     assert sort_covers(result) == sort_covers(expected)
   end
-  
+
   test "minimal_cover handles empty map" do
     assert Petrick.minimal_cover(%{}) == []
   end

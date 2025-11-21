@@ -58,7 +58,11 @@ defmodule BooleanAlgebra.Petrick do
   # Input: List of lists of MapSets. [[{A}, {B}], [{C}, {D}]] representing (A | B) & (C | D)
   # Output: List of MapSets. [{A,C}, {A,D}, {B,C}, {B,D}] representing (A & C) | (A & D) | (B & C) | (B & D)
   defp expand_pos_to_sop([first_sum | rest_sums]) do
-    Enum.reduce(rest_sums, first_sum, &multiply_two_sums/2)
+    Enum.reduce(rest_sums, first_sum, fn sum, acc ->
+      acc
+      |> multiply_two_sums(sum)
+      |> remove_supersets()
+    end)
   end
 
   defp expand_pos_to_sop([]), do: []

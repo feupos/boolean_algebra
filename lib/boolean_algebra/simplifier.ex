@@ -45,14 +45,26 @@ defmodule BooleanAlgebra.Simplifier do
 
       minimal_covers = Petrick.minimal_cover(coverage_map)
 
-      case minimal_covers do
-        [first_set | _] -> first_set
-        [] -> raise "No minimal covers found"
-      end
+      best_cover =
+        case minimal_covers do
+          [] ->
+            raise "No minimal covers found"
+
+          covers ->
+            Enum.min_by(covers, fn cover ->
+              Enum.reduce(cover, 0, fn pi, acc ->
+                acc + Enum.count(pi, &(&1 != :dont_care))
+              end)
+            end)
+        end
+
+      best_cover
       # Convert implicants back to AST
       |> Enum.map(&implicant_to_ast(&1, vars))
-      # Combine implicants with OR
-      |> Enum.reduce(fn ast1, ast2 -> AST.or_node(ast1, ast2) end)
+      # Sort by variables to ensure deterministic order (e.g. A before B)
+      |> Enum.sort_by(&AST.variables/1)
+      # Combine implicants with OR (left-associative to match expected structure)
+      |> Enum.reduce(fn element, acc -> AST.or_node(acc, element) end)
     end
   end
 

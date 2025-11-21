@@ -132,7 +132,7 @@ defmodule BooleanAlgebraSimplifierTest do
   describe "advanced expression simplification" do
     test "removes duplicates in multiple nested OR expressions" do
       expr = "a | (b | (a | c))"
-      expected = "a | (b | c)"
+      expected = "a | b | c"
 
       simplified = simplify(expr)
       expected_ast = parse(expected)
@@ -191,7 +191,7 @@ defmodule BooleanAlgebraSimplifierTest do
   describe "absorption and complex expression tests" do
     test "simplifies !a | (b | c) | (b & c)" do
       # (b & c) absorbed by (b | c)
-      assert simplify("(!a | (b | c)) | (b & c)") == parse("!a | (b | c)")
+      assert simplify("(!a | (b | c)) | (b & c)") == parse("!a | b | c")
     end
 
     test "absorption works regardless of operand order" do
@@ -266,19 +266,19 @@ defmodule BooleanAlgebraSimplifierTest do
       assert simplified == expected_ast
     end
 
-    # @tag :slow
-    # test "simplifies A&!B&E + !(B&C)&D&!E + !(C&D)&E+!A&D&!E + A&!(C&D)&E + A&E + A&B&!E + !(A&C) + B&C&!D to !A + B + !C + D + E" do
-    #   expr =
-    #     "A&!B&E | !(B&C)&D&!E | !(C&D)&E|!A&D&!E | A&!(C&D)&E | A&E | A&B&!E | !(A&C) | B&C&!D"
+    @tag :slow
+    test "simplifies A&!B&E + !(B&C)&D&!E + !(C&D)&E+!A&D&!E + A&!(C&D)&E + A&E + A&B&!E + !(A&C) + B&C&!D to !A + B + !C + D + E" do
+      expr =
+        "A&!B&E | !(B&C)&D&!E | !(C&D)&E|!A&D&!E | A&!(C&D)&E | A&E | A&B&!E | !(A&C) | B&C&!D"
 
-    #   expected = "!A | B | !C | D | E"
+      expected = "!A | B | !C | D | E"
 
-    #   simplified = simplify(expr)
-    #   expected_ast = parse(expected)
+      simplified = simplify(expr)
+      expected_ast = parse(expected)
 
-    #   assert TruthTable.from_ast(simplified) == TruthTable.from_ast(expected_ast)
-    #   assert simplified == expected_ast
-    # end
+      assert TruthTable.from_ast(simplified) == TruthTable.from_ast(expected_ast)
+      assert simplified == expected_ast
+    end
   end
 
   describe "XOR permutations" do
@@ -301,11 +301,11 @@ defmodule BooleanAlgebraSimplifierTest do
 
   describe "nested OR patterns" do
     test "simplifies (A & B) | ((A & C) | !A)" do
-      assert simplify("(a & b) | ((a & c) | !a)") == parse("!a | (b | c)")
+      assert simplify("(a & b) | ((a & c) | !a)") == parse("!a | b | c")
     end
 
     test "simplifies (A & B) | (!A | (A & C))" do
-      assert simplify("(a & b) | (!a | (a & c))") == parse("!a | (b | c)")
+      assert simplify("(a & b) | (!a | (a & c))") == parse("!a | b | c")
     end
   end
 
