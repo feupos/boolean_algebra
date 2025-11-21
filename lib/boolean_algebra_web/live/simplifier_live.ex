@@ -52,7 +52,7 @@ defmodule BooleanAlgebraWeb.SimplifierLive do
          loading: false
        )}
     else
-      case BooleanAlgebra.process(expr, operators: format) do
+      case BooleanAlgebra.process(expr, operators: format, parentheses: :full) do
         {:ok, result} ->
           {:noreply,
            assign(socket,
