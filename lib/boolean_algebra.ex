@@ -12,7 +12,6 @@ defmodule BooleanAlgebra do
     |> Parser.parse()
   end
 
-
   @doc """
   Simplifies a boolean expression.
   """

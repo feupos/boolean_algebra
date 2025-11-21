@@ -13,49 +13,41 @@ defmodule BooleanAlgebra.Petrick do
   Returns a list of minimal sets where each set is a list of implicants that together cover all minterms.
   """
   def minimal_cover(prime_implicant_table) when is_map(prime_implicant_table) do
-    # Convert coverage table to Product of Sums (POS) representation
-    product_of_sums =
-      prime_implicant_table
-      |> Map.values()
-      |> Enum.map(fn implicants_list ->
-        Enum.map(implicants_list, &MapSet.new([&1]))
-      end)
-
-    # Expand POS into Sum of Products (SOP)
-    all_covers = expand_pos_to_sop(product_of_sums)
-
-    # Remove supersets to find minimal covers
-    minimal_covers = remove_supersets(all_covers)
-
-    Enum.map(minimal_covers, &MapSet.to_list/1)
+    prime_implicant_table
+    |> Map.values()
+    # Convert coverage table to Product of Sums (POS) representation using MapSet to ensure unique implicants later
+    |> Enum.map(&Enum.map(&1, fn implicant -> MapSet.new([implicant]) end))
+    |> expand_and_minimize()
   end
 
-  # Recursively multiplies sum terms
+  # Expands POS to SOP while removing supersets at each step
   # [[{A}, {B}], [{C}, {D}]] -> [{A,C}, {A,D}, {B,C}, {B,D}]
-  defp expand_pos_to_sop([first_sum | rest_sums]) do
+  defp expand_and_minimize([first_sum | rest_sums]) do
     Enum.reduce(rest_sums, first_sum, fn sum, acc ->
       acc
-      |> multiply_two_sums(sum)
-      |> remove_supersets()
+      |> distribute_sums(sum)
+      |> keep_minimal()
     end)
   end
 
-  defp expand_pos_to_sop([]), do: []
+  defp expand_and_minimize([]), do: []
 
-  # Distributes two sums: (A | B) & (C | D) = (A & C) | (A & D) | (B & C) | (B & D)
-  defp multiply_two_sums(sum1, sum2) do
+  # distribute_sumss two sums: (A | B) & (C | D) = (A & C) | (A & D) | (B & C) | (B & D)
+  defp distribute_sums(sum1, sum2) do
     for term1 <- sum1, term2 <- sum2 do
       MapSet.union(term1, term2)
     end
   end
 
-  # Removes non-minimal covers (supersets)
-  defp remove_supersets(covers) do
+  # Keeps only minimal covers by removing supersets
+  defp keep_minimal(covers) do
+    # Sort covers by size to ensure minimal covers are kept first
+    # making the algorithm more efficient
     sorted_covers = Enum.sort_by(covers, &MapSet.size/1)
 
     Enum.reduce(sorted_covers, [], fn candidate, kept_covers ->
       is_redundant =
-        Enum.any?(kept_covers, fn existing -> MapSet.subset?(existing, candidate) end)
+        Enum.any?(kept_covers, &MapSet.subset?(&1, candidate))
 
       if is_redundant do
         kept_covers
@@ -63,6 +55,5 @@ defmodule BooleanAlgebra.Petrick do
         [candidate | kept_covers]
       end
     end)
-    |> Enum.reverse()
   end
 end

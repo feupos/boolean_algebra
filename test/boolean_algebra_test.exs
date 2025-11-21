@@ -86,7 +86,7 @@ defmodule BooleanAlgebraTest do
     assert length(qmc_steps) > 0
 
     first_step = List.first(qmc_steps)
-    assert first_step.type == :initial_grouping
+    assert first_step.type == :grouping
   end
 
   test "simplify_with_details returns error for invalid expression" do

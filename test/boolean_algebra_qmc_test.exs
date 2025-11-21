@@ -3,28 +3,9 @@ defmodule BooleanAlgebra.QMCTest do
 
   alias BooleanAlgebra.QMC
 
-  test "int_to_bits produces correct bit list" do
-    assert QMC.int_to_bits(0b0101, 4) == [false, true, false, true]
-    assert QMC.int_to_bits(0b1110, 4) == [true, true, true, false]
-  end
-
-  test "group_minterms groups correctly" do
-    minterms = [0, 1, 3, 7, 8, 9]
-    grouped = QMC.group_minterms(minterms, 4)
-    assert Map.keys(grouped) == [0, 1, 2, 3]
-
-    # Check group 0 (minterm 0 -> [0,0,0,0])
-    assert grouped[0] == [[false, false, false, false]]
-
-    # Check group 1 (minterms 1, 8)
-    # 1 -> [0,0,0,1], 8 -> [1,0,0,0]
-    expected_group_1 = [
-      [false, false, false, true],
-      [true, false, false, false]
-    ]
-
-    # Sort to compare ignoring order
-    assert Enum.sort(grouped[1]) == Enum.sort(expected_group_1)
+  test "minterm_to_implicant produces correct bit list" do
+    assert QMC.minterm_to_implicant(0b0101, 4) == [false, true, false, true]
+    assert QMC.minterm_to_implicant(0b1110, 4) == [true, true, true, false]
   end
 
   test "find_prime_implicants finds prime implicants correctly" do

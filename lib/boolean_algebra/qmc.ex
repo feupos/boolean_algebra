@@ -27,27 +27,21 @@ defmodule BooleanAlgebra.QMC do
   """
   @spec prime_implicants([minterm()], integer()) :: {[implicant()], [map()]}
   def prime_implicants(minterms, num_vars) do
-    # Group minterms by number of 1s
-    initial_groups = group_minterms(minterms, num_vars)
+    # Convert minterms to implicants
+    implicants = Enum.map(minterms, &minterm_to_implicant(&1, num_vars))
 
     # Find all prime implicants by iteratively merging groups
-    {prime_implicants, steps} = find_prime_implicants_with_steps(initial_groups, num_vars)
+    {prime_implicants, steps} = find_prime_implicants_with_steps(implicants, num_vars)
 
-    {prime_implicants, [%{type: :initial_grouping, groups: initial_groups} | steps]}
+    {prime_implicants, steps}
   end
 
-  @doc """
-  Groups minterms by the number of 1-bits they contain.
-  Returns a map where keys are the count of 1s and values are lists of implicants (as bit lists).
-  """
-  @spec group_minterms([minterm()], integer()) :: grouped_implicants()
-  def group_minterms(minterms, num_vars) do
-    minterms
-    |> Enum.map(&int_to_bits(&1, num_vars))
-    |> Enum.group_by(&count_ones_in_list/1)
-  end
+  defp find_prime_implicants_with_steps(implicants, num_vars, acc_steps \\ []) do
+    # Group implicants by number of 1s on first call or regroup after merging
+    grouped_implicants = group_by_ones(implicants)
 
-  defp find_prime_implicants_with_steps(grouped_implicants, num_vars, acc_steps \\ []) do
+    initial_step = %{type: :grouping, groups: grouped_implicants}
+
     group_keys = Map.keys(grouped_implicants) |> Enum.sort()
 
     # Iterate through groups and try to merge adjacent groups
@@ -78,7 +72,7 @@ defmodule BooleanAlgebra.QMC do
         {new_next_groups, acc_unmerged ++ unmerged_in_this_step, [merge_info | acc_merges]}
       end)
 
-    current_step = %{
+    merge_step = %{
       type: :merge_pass,
       groups_before: grouped_implicants,
       groups_after: next_generation_groups,
@@ -87,13 +81,16 @@ defmodule BooleanAlgebra.QMC do
     }
 
     if map_size(next_generation_groups) > 0 do
-      regrouped = regroup_by_ones(next_generation_groups)
+      # Flatten for next iteration
+      next_implicants = next_generation_groups |> Map.values() |> Enum.concat()
 
       {primes_from_recursion, steps_from_recursion} =
-        find_prime_implicants_with_steps(regrouped, num_vars, [current_step | acc_steps])
+        find_prime_implicants_with_steps(next_implicants, num_vars, [
+          merge_step,
+          initial_step | acc_steps
+        ])
 
-      current_pass_primes = Enum.uniq(unmerged_from_current_pass)
-      all_primes = Enum.uniq(current_pass_primes ++ primes_from_recursion)
+      all_primes = Enum.uniq(unmerged_from_current_pass ++ primes_from_recursion)
 
       {all_primes, steps_from_recursion}
     else
@@ -104,34 +101,31 @@ defmodule BooleanAlgebra.QMC do
         |> Enum.concat()
         |> Enum.uniq()
 
-      {all_primes, Enum.reverse([current_step | acc_steps])}
+      {all_primes, Enum.reverse([merge_step, initial_step | acc_steps])}
     end
   end
 
-  # Merges two groups of implicants (e.g. group with N ones and group with N+1 ones).
-  # Returns {merged_implicants, any_merge_happened?, unmerged_from_group1}
+  # Merges two groups of implicants (e.g. group with N ones and group with N+1 ones)
+  # Returns {merged_implicants, unmerged_from_group1}
   defp merge_adjacent_groups(group1, group2) do
-    # 1. Find all merges
-    {merged_list, merged_indices_1} =
-      Enum.reduce(Enum.with_index(group1), {[], MapSet.new()}, fn {imp1, idx1},
-                                                                  {acc_merged, acc_indices} ->
-        # Try to find matches in group2
-        matches =
-          Enum.filter(group2, fn imp2 -> can_merge?(imp1, imp2) end)
+    indexed_group1 = Enum.with_index(group1)
+
+    {merged_list, merged_indices} =
+      Enum.reduce(indexed_group1, {[], MapSet.new()}, fn {imp1, idx1},
+                                                         {acc_merged, acc_indices} ->
+        matches = Enum.filter(group2, &can_merge?(imp1, &1))
 
         if matches != [] do
-          new_merges = Enum.map(matches, fn imp2 -> merge(imp1, imp2) end)
+          new_merges = Enum.map(matches, &merge(imp1, &1))
           {acc_merged ++ new_merges, MapSet.put(acc_indices, idx1)}
         else
           {acc_merged, acc_indices}
         end
       end)
 
-    # 2. Identify unmerged items from group1
     unmerged_from_group1 =
-      group1
-      |> Enum.with_index()
-      |> Enum.reject(fn {_imp, idx} -> MapSet.member?(merged_indices_1, idx) end)
+      indexed_group1
+      |> Enum.reject(fn {_imp, idx} -> MapSet.member?(merged_indices, idx) end)
       |> Enum.map(fn {imp, _} -> imp end)
 
     {merged_list, unmerged_from_group1}
@@ -155,23 +149,20 @@ defmodule BooleanAlgebra.QMC do
     end)
   end
 
-  # Regroup merged implicants by number of 1s (ignoring :dont_care bits)
-  defp regroup_by_ones(implicants_map) do
-    implicants_map
-    |> Map.values()
-    |> Enum.concat()
-    |> Enum.group_by(&count_ones_in_list/1)
+  # Groups implicants by number of 1s (ignoring :dont_care bits)
+  defp group_by_ones(implicants) when is_list(implicants) do
+    Enum.group_by(implicants, &count_ones_in_implicant/1)
   end
 
-  defp count_ones_in_list(implicant_list) do
+  defp count_ones_in_implicant(implicant_list) do
     Enum.count(implicant_list, fn c -> c == true end)
   end
 
   @doc """
-  Converts an integer to a list of bits of length n.
+  Converts an minterm (integer) to an implicant (list of bits) of length n.
   Most significant bit first.
   """
-  def int_to_bits(num, n) do
+  def minterm_to_implicant(num, n) do
     Enum.map((n - 1)..0//-1, fn i ->
       (num >>> i &&& 1) == 1
     end)
@@ -185,18 +176,17 @@ defmodule BooleanAlgebra.QMC do
   """
   def coverage_table(prime_implicants, minterms, num_vars) do
     Enum.reduce(minterms, %{}, fn minterm, acc ->
-      implicants_covering =
-        Enum.filter(prime_implicants, fn implicant ->
-          covers_minterm?(implicant, minterm, num_vars)
-        end)
-
-      Map.put(acc, minterm, implicants_covering)
+      Map.put(
+        acc,
+        minterm,
+        Enum.filter(prime_implicants, &covers_minterm?(&1, minterm, num_vars))
+      )
     end)
   end
 
   # Checks if a specific implicant covers a minterm
   defp covers_minterm?(implicant, minterm, num_vars) do
-    minterm_bits = int_to_bits(minterm, num_vars)
+    minterm_bits = minterm_to_implicant(minterm, num_vars)
 
     Enum.zip(implicant, minterm_bits)
     |> Enum.all?(fn
