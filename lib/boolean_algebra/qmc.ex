@@ -162,6 +162,7 @@ defmodule BooleanAlgebra.QMC do
   Converts an minterm (integer) to an implicant (list of bits) of length n.
   Most significant bit first.
   """
+  @spec minterm_to_implicant(minterm(), pos_integer()) :: implicant()
   def minterm_to_implicant(num, n) do
     Enum.map((n - 1)..0//-1, fn i ->
       (num >>> i &&& 1) == 1
@@ -174,6 +175,9 @@ defmodule BooleanAlgebra.QMC do
 
   Returns a map: %{minterm => [implicants_that_cover_it]}
   """
+  @spec coverage_table([implicant()], [minterm()], pos_integer()) :: %{
+          minterm() => [implicant()]
+        }
   def coverage_table(prime_implicants, minterms, num_vars) do
     Enum.reduce(minterms, %{}, fn minterm, acc ->
       Map.put(

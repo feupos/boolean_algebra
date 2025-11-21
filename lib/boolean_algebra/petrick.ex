@@ -7,11 +7,15 @@ defmodule BooleanAlgebra.Petrick do
   - https://en.wikipedia.org/wiki/Petrick%27s_method
   """
 
+  @type implicant :: [boolean() | :dont_care]
+  @type coverage_table :: %{integer() => [implicant()]}
+
   @doc """
   Finds minimal covers given a prime implicant coverage table.
 
   Returns a list of minimal sets where each set is a list of implicants that together cover all minterms.
   """
+  @spec minimal_cover(coverage_table()) :: [[implicant()]]
   def minimal_cover(prime_implicant_table) when is_map(prime_implicant_table) do
     prime_implicant_table
     |> Map.values()
