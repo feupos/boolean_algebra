@@ -22,29 +22,15 @@ defmodule BooleanAlgebra.QMC do
   @type grouped_implicants :: %{group_id() => [implicant()]}
 
   @doc """
-  Minimize the boolean function represented by the given minterms and number of variables.
-  Returns a list of prime implicants. Each prime implicant is a list of booleans and `:dont_care` atoms.
-  """
-  @spec minimize([minterm()], integer()) :: [implicant()]
-  def minimize(minterms, num_vars) when is_list(minterms) and is_integer(num_vars) do
-    # Step 1: Group minterms by number of 1s
-    initial_groups = group_minterms(minterms, num_vars)
-
-    # Step 2: Find all prime implicants by iteratively merging groups
-    # We use the version with steps to avoid code duplication, even if we discard the steps.
-    {prime_implicants, _steps} = find_prime_implicants_with_steps(initial_groups, num_vars)
-    prime_implicants
-  end
-
-  @doc """
-  Same as minimize/2 but returns the steps taken during the Quine-McCluskey algorithm.
+  Finds all prime implicants for the given minterms.
   Returns `{prime_implicants, steps}` where steps is a list of maps describing each pass.
   """
-  def minimize_with_steps(minterms, num_vars) do
-    # Step 1: Group minterms by number of 1s
+  @spec prime_implicants([minterm()], integer()) :: {[implicant()], [map()]}
+  def prime_implicants(minterms, num_vars) do
+    # Group minterms by number of 1s
     initial_groups = group_minterms(minterms, num_vars)
 
-    # Step 2: Find all prime implicants by iteratively merging groups
+    # Find all prime implicants by iteratively merging groups
     {prime_implicants, steps} = find_prime_implicants_with_steps(initial_groups, num_vars)
 
     {prime_implicants, [%{type: :initial_grouping, groups: initial_groups} | steps]}
@@ -71,7 +57,7 @@ defmodule BooleanAlgebra.QMC do
         current_group = Map.get(grouped_implicants, key, [])
         next_group = Map.get(grouped_implicants, key + 1, [])
 
-        {merged_implicants, _merged_flag, unmerged_in_this_step} =
+        {merged_implicants, unmerged_in_this_step} =
           merge_adjacent_groups(current_group, next_group)
 
         new_next_groups =
@@ -148,7 +134,7 @@ defmodule BooleanAlgebra.QMC do
       |> Enum.reject(fn {_imp, idx} -> MapSet.member?(merged_indices_1, idx) end)
       |> Enum.map(fn {imp, _} -> imp end)
 
-    {merged_list, MapSet.size(merged_indices_1) > 0, unmerged_from_group1}
+    {merged_list, unmerged_from_group1}
   end
 
   # Checks if two implicants can merge (differ by exactly one bit)

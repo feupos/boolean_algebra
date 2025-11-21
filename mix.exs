@@ -14,7 +14,7 @@ defmodule BooleanAlgebra.MixProject do
       listeners: [Phoenix.CodeReloader],
       test_coverage: [
         tool: ExCoveralls,
-        threshold: 50
+        threshold: 75
       ]
     ]
   end

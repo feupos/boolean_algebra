@@ -29,7 +29,7 @@ defmodule BooleanAlgebra.QMCTest do
 
   test "find_prime_implicants finds prime implicants correctly" do
     minterms = [0, 1, 2, 5, 6, 7]
-    primes = QMC.minimize(minterms, 3)
+    {primes, _steps} = QMC.prime_implicants(minterms, 3)
 
     # Expected prime implicants:
     # 0 (000), 1 (001) -> 00- (0,1) -> [false, false, :dont_care]
@@ -72,13 +72,14 @@ defmodule BooleanAlgebra.QMCTest do
 
   test "minimize returns prime implicants for non-empty minterms" do
     minterms = [1, 3, 5, 7]
-    primes = QMC.minimize(minterms, 3)
+    {primes, _steps} = QMC.prime_implicants(minterms, 3)
     assert is_list(primes)
     assert length(primes) > 0
     assert Enum.all?(primes, &is_list/1)
   end
 
   test "minimize returns empty list for empty minterms" do
-    assert QMC.minimize([], 3) == []
+    {primes, _steps} = QMC.prime_implicants([], 3)
+    assert primes == []
   end
 end

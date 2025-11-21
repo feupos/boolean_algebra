@@ -52,21 +52,14 @@ defmodule BooleanAlgebraWeb.SimplifierLive do
          loading: false
        )}
     else
-      case BooleanAlgebra.simplify_with_details(expr, operators: format) do
-        {:ok, simplified, details} ->
-          truth_table =
-            try do
-              BooleanAlgebra.truth_table(expr)
-            rescue
-              _ -> []
-            end
-
+      case BooleanAlgebra.process(expr, operators: format) do
+        {:ok, result} ->
           {:noreply,
            assign(socket,
              input: expr,
-             simplified: simplified,
-             details: details,
-             truth_table: truth_table,
+             simplified: result.simplification,
+             details: result.details,
+             truth_table: result.truth_table,
              error: nil,
              format: format,
              loading: false

@@ -12,6 +12,7 @@ defmodule BooleanAlgebra do
     |> Parser.parse()
   end
 
+
   @doc """
   Simplifies a boolean expression.
   """
@@ -24,8 +25,8 @@ defmodule BooleanAlgebra do
         raise ArgumentError, message: reason
 
       {:ok, ast} ->
-        Simplifier.simplify(ast)
-        |> Formatter.to_string()
+        {simplified_ast, _details} = Simplifier.simplify(ast)
+        Formatter.to_string(simplified_ast)
     end
   end
 
@@ -42,14 +43,7 @@ defmodule BooleanAlgebra do
         {:error, reason}
 
       {:ok, ast} ->
-        original_complexity = Simplifier.complexity(ast)
-        {simplified_ast, details} = Simplifier.simplify_with_details(ast)
-        complexity = Simplifier.complexity(simplified_ast)
-
-        details =
-          details
-          |> Map.put(:complexity, complexity)
-          |> Map.put(:original_complexity, original_complexity)
+        {simplified_ast, details} = Simplifier.simplify(ast)
 
         {:ok, Formatter.to_string(simplified_ast, opts), details}
     end
@@ -57,18 +51,16 @@ defmodule BooleanAlgebra do
 
   @doc """
   Processes a boolean expression and returns requested outputs.
+  Always returns simplification, details, and truth table.
 
   ## Options
-    * `:output` - List of desired outputs: `:simplification`, `:truth_table`, `:details`.
-      Defaults to `[:simplification]`.
+    * `operators` - Formatting options for the output string.
 
   ## Returns
-    * `{:ok, result_map}` where result_map contains keys for requested outputs.
+    * `{:ok, result_map}` where result_map contains keys: `:simplification`, `:details`, `:truth_table`.
     * `{:error, reason}`
   """
   def process(input, opts \\ []) when is_binary(input) do
-    output_opts = Keyword.get(opts, :output, [:simplification])
-
     input
     |> parse()
     |> case do
@@ -76,35 +68,15 @@ defmodule BooleanAlgebra do
         {:error, reason}
 
       {:ok, ast} ->
-        result = %{}
+        {simplified_ast, details} = Simplifier.simplify(ast)
+        simplification = Formatter.to_string(simplified_ast, opts)
+        truth_table = TruthTable.from_ast(ast)
 
-        # 1. Truth Table (if requested)
-        result =
-          if :truth_table in output_opts do
-            Map.put(result, :truth_table, TruthTable.from_ast(ast))
-          else
-            result
-          end
-
-        # 2. Simplification and Details
-        # If details are requested, we must run the full simplification with details.
-        # If only simplification is requested, we run the optimized version.
-        result =
-          cond do
-            :details in output_opts ->
-              {simplified_ast, details} = Simplifier.simplify_with_details(ast)
-
-              result
-              |> Map.put(:details, details)
-              |> Map.put(:simplification, Formatter.to_string(simplified_ast, opts))
-
-            :simplification in output_opts ->
-              simplified_ast = Simplifier.simplify(ast)
-              Map.put(result, :simplification, Formatter.to_string(simplified_ast, opts))
-
-            true ->
-              result
-          end
+        result = %{
+          simplification: simplification,
+          details: details,
+          truth_table: truth_table
+        }
 
         {:ok, result}
     end

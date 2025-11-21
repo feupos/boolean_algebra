@@ -15,6 +15,7 @@ defmodule BooleanAlgebraSimplifierTest do
     expr
     |> parse()
     |> Simplifier.simplify()
+    |> elem(0)
   end
 
   describe "basic expression simplification" do
@@ -51,18 +52,12 @@ defmodule BooleanAlgebraSimplifierTest do
     end
   end
 
-  describe "complex expression simplification" do
-    test "simplifies nested expressions" do
-      assert simplify("(a & 1) | 0") == parse("a")
-    end
+  test "simplifies expressions with double negation" do
+    assert simplify("!!a") == parse("a")
+  end
 
-    test "simplifies expressions with double negation" do
-      assert simplify("!!a") == parse("a")
-    end
-
-    test "simplifies complex expressions with multiple operations" do
-      assert simplify("(a | 0) & !0") == parse("a")
-    end
+  test "simplifies complex expressions with multiple operations" do
+    assert simplify("(a | 0) & !0") == parse("a")
   end
 
   describe "identity and absorption laws" do
@@ -254,7 +249,7 @@ defmodule BooleanAlgebraSimplifierTest do
   end
 
   describe "5-variable simplification" do
-    @tag :slow
+    # https://math.stackexchange.com/questions/412941/boolean-simplification-5-variables
     test "simplifies (xyz+uv)*((x+!y+!z)+uv) to xyz+uv" do
       expr = "((x & y & z) | (u & v)) & ((x | !y | !z) | (u & v))"
       expected = "(u & v) | (x & (y & z))"
@@ -266,7 +261,7 @@ defmodule BooleanAlgebraSimplifierTest do
       assert simplified == expected_ast
     end
 
-    @tag :slow
+    # https://stackoverflow.com/questions/47214327/simplifying-5-var-boolean-sop-expression-using-the-laws-and-properties
     test "simplifies A&!B&E + !(B&C)&D&!E + !(C&D)&E+!A&D&!E + A&!(C&D)&E + A&E + A&B&!E + !(A&C) + B&C&!D to !A + B + !C + D + E" do
       expr =
         "A&!B&E | !(B&C)&D&!E | !(C&D)&E|!A&D&!E | A&!(C&D)&E | A&E | A&B&!E | !(A&C) | B&C&!D"
@@ -380,6 +375,121 @@ defmodule BooleanAlgebraSimplifierTest do
 
     test "rule 16: (B | A) & A" do
       assert simplify("(b | a) & a") == parse("a")
+    end
+  end
+
+  describe "details and edge cases" do
+    test "minimize returns details" do
+      expr = "a & b"
+      assert {simplified, details} = Simplifier.minimize(parse(expr))
+      assert simplified == parse("a & b")
+      assert Map.has_key?(details, :qmc_steps)
+      assert Map.has_key?(details, :prime_implicants)
+    end
+
+    test "minimize handles false expression" do
+      expr = "a & !a"
+      assert {simplified, details} = Simplifier.minimize(parse(expr))
+      assert simplified == {:const, false}
+      assert details.prime_implicants == []
+    end
+
+    test "simplify returns details and simplified AST" do
+      expr = "a & (a | b)"
+      assert {simplified, details} = Simplifier.simplify(parse(expr))
+      assert simplified == parse("a")
+      assert Map.has_key?(details, :qmc_steps)
+    end
+  end
+
+  describe "apply_rules coverage" do
+    # Pattern: (A & B) | !A = !A | B (commutative)
+    test "rule 3 commutative: (B & A) | !A" do
+      assert simplify("(b & a) | !a") == parse("!a | b")
+    end
+
+    # Pattern: A | (!A & B) = A | B
+    test "rule 5: A | (!A & B)" do
+      assert simplify("a | (!a & b)") == parse("a | b")
+    end
+
+    test "rule 6: A | (B & !A)" do
+      assert simplify("a | (b & !a)") == parse("a | b")
+    end
+
+    # Pattern: (!A & B) | A = A | B
+    test "rule 7: (!A & B) | a" do
+      assert simplify("(!a & b) | a") == parse("a | b")
+    end
+
+    test "rule 8: (B & !A) | a" do
+      assert simplify("(b & !a) | a") == parse("a | b")
+    end
+
+    # Pattern: A | (A & B) = A
+    test "rule 9: A | (A & B)" do
+      assert simplify("a | (a & b)") == parse("a")
+    end
+
+    test "rule 10: A | (B & A)" do
+      assert simplify("a | (b & a)") == parse("a")
+    end
+
+    # Pattern: (A & B) | A = A
+    test "rule 11: (A & B) | A" do
+      assert simplify("(a & b) | a") == parse("a")
+    end
+
+    test "rule 12: (B & A) | A" do
+      assert simplify("(b & a) | a") == parse("a")
+    end
+
+    # Pattern: A & (A | B) = A
+    test "rule 13: A & (A | B)" do
+      assert simplify("a & (a | b)") == parse("a")
+    end
+
+    test "rule 14: A & (B | A)" do
+      assert simplify("a & (b | a)") == parse("a")
+    end
+
+    # Pattern: (A | B) & A = A
+    test "rule 15: (A | B) & A" do
+      assert simplify("(a | b) & a") == parse("a")
+    end
+
+    test "rule 16: (B | A) & A" do
+      assert simplify("(b | a) & a") == parse("a")
+    end
+
+    # XOR patterns
+    test "XOR pattern 1: (!A & B) | (!B & A)" do
+      assert simplify("(!a & b) | (!b & a)") == parse("a ^ b")
+    end
+
+    test "XOR pattern 2: (!A & B) | (A & !B)" do
+      assert simplify("(!a & b) | (a & !b)") == parse("a ^ b")
+    end
+
+    test "XOR pattern 3: (A & !B) | (!A & B)" do
+      assert simplify("(a & !b) | (!a & b)") == parse("a ^ b")
+    end
+
+    test "XOR pattern 4: (A & !B) | (B & !A)" do
+      assert simplify("(a & !b) | (b & !a)") == parse("a ^ b")
+    end
+  end
+
+  describe "implicant_to_ast coverage" do
+    test "handles all literal types" do
+      # Constant true
+      assert simplify("1") == parse("1")
+
+      # Single literal
+      assert simplify("a") == parse("a")
+
+      # Multiple literals
+      assert simplify("a & b") == parse("a & b")
     end
   end
 end

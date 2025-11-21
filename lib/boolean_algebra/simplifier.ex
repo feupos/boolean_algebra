@@ -13,65 +13,21 @@ defmodule BooleanAlgebra.Simplifier do
 
   @doc """
   Simplifies a boolean expression.
+  Returns `{simplified_ast, details}`.
   """
-  @spec simplify(AST.t()) :: AST.t()
+  @spec simplify(AST.t()) :: {AST.t(), map()}
   def simplify(expr) do
-    expr
-    |> minimize()
-    |> apply_rules()
+    {minimized_ast, details} = minimize(expr)
+    simplified_ast = apply_rules(minimized_ast)
+    {simplified_ast, details}
   end
 
   @doc """
-  Given a Boolean AST, find the minimal expression using QMC and Petrick's method
+  Given a Boolean AST, find the minimal expression using QMC and Petrick's method.
+  Returns `{minimized_ast, details}`.
   """
-  @spec minimize(AST.t()) :: AST.t()
+  @spec minimize(AST.t()) :: {AST.t(), map()}
   def minimize(expr) do
-    vars = AST.variables(expr)
-
-    minterms =
-      expr
-      |> TruthTable.from_ast()
-      |> Enum.with_index()
-      |> Enum.filter(fn {row, _idx} -> Map.get(row, :result) end)
-      |> Enum.map(fn {_row, idx} -> idx end)
-
-    # Handle empty minterms (expression always false)
-    if minterms == [] do
-      AST.const_node(false)
-    else
-      # Use optimized QMC without step tracking
-      prime_implicants = QMC.minimize(minterms, length(vars))
-      coverage_map = QMC.coverage_table(prime_implicants, minterms, length(vars))
-
-      minimal_covers = Petrick.minimal_cover(coverage_map)
-
-      best_cover =
-        case minimal_covers do
-          [] ->
-            raise "No minimal covers found"
-
-          covers ->
-            Enum.min_by(covers, fn cover ->
-              Enum.reduce(cover, 0, fn pi, acc ->
-                acc + Enum.count(pi, &(&1 != :dont_care))
-              end)
-            end)
-        end
-
-      best_cover
-      # Convert implicants back to AST
-      |> Enum.map(&implicant_to_ast(&1, vars))
-      # Sort by variables to ensure deterministic order (e.g. A before B)
-      |> Enum.sort_by(&AST.variables/1)
-      # Combine implicants with OR (left-associative to match expected structure)
-      |> Enum.reduce(fn element, acc -> AST.or_node(acc, element) end)
-    end
-  end
-
-  @doc """
-  Same as minimize/1 but returns details about the minimization process.
-  """
-  def minimize_with_details(expr) do
     vars = AST.variables(expr)
 
     minterms =
@@ -85,33 +41,37 @@ defmodule BooleanAlgebra.Simplifier do
     if minterms == [] do
       {{:const, false}, %{qmc_steps: [], prime_implicants: []}}
     else
-      {prime_implicants, qmc_steps} = QMC.minimize_with_steps(minterms, length(vars))
+      # Use QMC with step tracking as we always want details now
+      {prime_implicants, qmc_steps} = QMC.prime_implicants(minterms, length(vars))
       coverage_map = QMC.coverage_table(prime_implicants, minterms, length(vars))
 
       minimal_covers = Petrick.minimal_cover(coverage_map)
 
-      # Select the first minimal cover (could be multiple)
-      final_ast =
+      # Select the minimal cover with the lowest complexity
+      best_cover =
         case minimal_covers do
-          [first_set | _] -> first_set
-          [] -> raise "No minimal covers found"
+          [] ->
+            raise "No minimal covers found"
+
+          covers ->
+            Enum.min_by(covers, fn cover ->
+              Enum.reduce(cover, 0, fn pi, acc ->
+                acc + Enum.count(pi, &(&1 != :dont_care))
+              end)
+            end)
         end
+
+      final_ast =
+        best_cover
         # Convert implicants back to AST
         |> Enum.map(&implicant_to_ast(&1, vars))
-        # Combine implicants with OR
-        |> Enum.reduce(fn ast1, ast2 -> {:or, ast1, ast2} end)
+        # Sort by variables to ensure deterministic order
+        |> Enum.sort_by(&AST.variables/1)
+        # Combine implicants with OR (left-associative)
+        |> Enum.reduce(fn element, acc -> AST.or_node(acc, element) end)
 
       {final_ast, %{qmc_steps: qmc_steps, prime_implicants: prime_implicants}}
     end
-  end
-
-  @doc """
-  Simplifies a boolean expression and returns details.
-  """
-  def simplify_with_details(expr) do
-    {minimized_ast, details} = minimize_with_details(expr)
-    simplified_ast = apply_rules(minimized_ast)
-    {simplified_ast, details}
   end
 
   # Convert an implicant pattern (e.g., [true, :dont_care, false]) back to AST
@@ -257,12 +217,4 @@ defmodule BooleanAlgebra.Simplifier do
 
   defp apply_rules({:not, expr}), do: {:not, apply_rules(expr)}
   defp apply_rules(expr), do: expr
-
-  @doc """
-  Calculates the complexity of the expression based on the number of segments (literals).
-  """
-  def complexity({:var, _}), do: 1
-  def complexity({:const, _}), do: 1
-  def complexity({:not, expr}), do: complexity(expr)
-  def complexity({_op, left, right}), do: complexity(left) + complexity(right)
 end
