@@ -23,7 +23,6 @@ defmodule BooleanAlgebra.QMC do
 
   @doc """
   Minimize the boolean function represented by the given minterms and number of variables.
-
   Returns a list of prime implicants. Each prime implicant is a list of booleans and `:dont_care` atoms.
   """
   @spec minimize([minterm()], integer()) :: [implicant()]
@@ -32,9 +31,23 @@ defmodule BooleanAlgebra.QMC do
     initial_groups = group_minterms(minterms, num_vars)
 
     # Step 2: Find all prime implicants by iteratively merging groups
-    {prime_implicants, _} = find_prime_implicants(initial_groups, num_vars)
-
+    # We use the version with steps to avoid code duplication, even if we discard the steps.
+    {prime_implicants, _steps} = find_prime_implicants_with_steps(initial_groups, num_vars)
     prime_implicants
+  end
+
+  @doc """
+  Same as minimize/2 but returns the steps taken during the Quine-McCluskey algorithm.
+  Returns `{prime_implicants, steps}` where steps is a list of maps describing each pass.
+  """
+  def minimize_with_steps(minterms, num_vars) do
+    # Step 1: Group minterms by number of 1s
+    initial_groups = group_minterms(minterms, num_vars)
+
+    # Step 2: Find all prime implicants by iteratively merging groups
+    {prime_implicants, steps} = find_prime_implicants_with_steps(initial_groups, num_vars)
+
+    {prime_implicants, [%{type: :initial_grouping, groups: initial_groups} | steps]}
   end
 
   @doc """
@@ -48,29 +61,19 @@ defmodule BooleanAlgebra.QMC do
     |> Enum.group_by(&count_ones_in_list/1)
   end
 
-  @doc """
-  Finds all prime implicants by iterative merging of grouped minterms.
-  This corresponds to the first major phase of the Quine-McCluskey algorithm.
-
-  It repeatedly tries to merge implicants from adjacent groups (differing by 1 bit).
-  Implicants that cannot be merged further are collected as prime implicants.
-
-  Returns `{prime_implicants, unused_implicants}`.
-  """
-  def find_prime_implicants(grouped_implicants, num_vars) do
+  defp find_prime_implicants_with_steps(grouped_implicants, num_vars, acc_steps \\ []) do
     group_keys = Map.keys(grouped_implicants) |> Enum.sort()
 
-    # Iterate through groups and try to merge adjacent groups (e.g., group 0 with group 1, group 1 with group 2)
-    {next_generation_groups, unmerged_from_current_pass} =
-      Enum.reduce(group_keys, {%{}, []}, fn key, {acc_next_groups, acc_unmerged} ->
+    # Iterate through groups and try to merge adjacent groups
+    {next_generation_groups, unmerged_from_current_pass, merge_details} =
+      Enum.reduce(group_keys, {%{}, [], []}, fn key,
+                                                {acc_next_groups, acc_unmerged, acc_merges} ->
         current_group = Map.get(grouped_implicants, key, [])
         next_group = Map.get(grouped_implicants, key + 1, [])
 
-        # Try to merge items from current_group with next_group
         {merged_implicants, _merged_flag, unmerged_in_this_step} =
           merge_adjacent_groups(current_group, next_group)
 
-        # If we found merges, add them to the next generation of groups
         new_next_groups =
           if merged_implicants != [] do
             Map.update(acc_next_groups, key, merged_implicants, &(merged_implicants ++ &1))
@@ -78,32 +81,44 @@ defmodule BooleanAlgebra.QMC do
             acc_next_groups
           end
 
-        # Collect unmerged implicants (candidates for prime implicants)
-        {new_next_groups, acc_unmerged ++ unmerged_in_this_step}
+        # Record merge details for this pair of groups
+        merge_info = %{
+          group: key,
+          next_group: key + 1,
+          merged: merged_implicants,
+          unmerged: unmerged_in_this_step
+        }
+
+        {new_next_groups, acc_unmerged ++ unmerged_in_this_step, [merge_info | acc_merges]}
       end)
 
-    # If we generated any new groups, we must recurse to try to merge them further.
+    current_step = %{
+      type: :merge_pass,
+      groups_before: grouped_implicants,
+      groups_after: next_generation_groups,
+      merges: Enum.reverse(merge_details),
+      unmerged: unmerged_from_current_pass
+    }
+
     if map_size(next_generation_groups) > 0 do
-      # Regroup by number of ones for the next pass
       regrouped = regroup_by_ones(next_generation_groups)
 
-      {primes_from_recursion, _} = find_prime_implicants(regrouped, num_vars)
+      {primes_from_recursion, steps_from_recursion} =
+        find_prime_implicants_with_steps(regrouped, num_vars, [current_step | acc_steps])
 
-      # The unmerged items from this pass are prime implicants
       current_pass_primes = Enum.uniq(unmerged_from_current_pass)
       all_primes = Enum.uniq(current_pass_primes ++ primes_from_recursion)
 
-      {all_primes, []}
+      {all_primes, steps_from_recursion}
     else
       # Base case: No more merges possible.
-      # All groups contain prime implicants.
       all_primes =
         grouped_implicants
         |> Map.values()
         |> Enum.concat()
         |> Enum.uniq()
 
-      {all_primes, []}
+      {all_primes, Enum.reverse([current_step | acc_steps])}
     end
   end
 
@@ -112,7 +127,8 @@ defmodule BooleanAlgebra.QMC do
   defp merge_adjacent_groups(group1, group2) do
     # 1. Find all merges
     {merged_list, merged_indices_1} =
-      Enum.reduce(Enum.with_index(group1), {[], MapSet.new()}, fn {imp1, idx1}, {acc_merged, acc_indices} ->
+      Enum.reduce(Enum.with_index(group1), {[], MapSet.new()}, fn {imp1, idx1},
+                                                                  {acc_merged, acc_indices} ->
         # Try to find matches in group2
         matches =
           Enum.filter(group2, fn imp2 -> can_merge?(imp1, imp2) end)
@@ -178,7 +194,7 @@ defmodule BooleanAlgebra.QMC do
   @doc """
   Given prime implicants and a list of minterms,
   build a coverage map from minterms to implicants covering them.
-  
+
   Returns a map: %{minterm => [implicants_that_cover_it]}
   """
   def coverage_table(prime_implicants, minterms, num_vars) do

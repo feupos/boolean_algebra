@@ -71,4 +71,27 @@ defmodule BooleanAlgebraTest do
       assert row.result in [true, false]
     end
   end
+
+  test "simplify_with_details returns steps for valid expression" do
+    input = "a AND b OR a AND c"
+    assert {:ok, simplified, details} = BooleanAlgebra.simplify_with_details(input)
+    
+    assert is_binary(simplified)
+    assert is_map(details)
+    assert Map.has_key?(details, :qmc_steps)
+    assert Map.has_key?(details, :prime_implicants)
+    
+    qmc_steps = details.qmc_steps
+    assert is_list(qmc_steps)
+    assert length(qmc_steps) > 0
+    
+    first_step = List.first(qmc_steps)
+    assert first_step.type == :initial_grouping
+  end
+
+  test "simplify_with_details returns error for invalid expression" do
+    input = "a AND OR b"
+    assert {:error, reason} = BooleanAlgebra.simplify_with_details(input)
+    assert is_binary(reason)
+  end
 end

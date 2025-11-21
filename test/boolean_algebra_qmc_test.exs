@@ -12,24 +12,24 @@ defmodule BooleanAlgebra.QMCTest do
     minterms = [0, 1, 3, 7, 8, 9]
     grouped = QMC.group_minterms(minterms, 4)
     assert Map.keys(grouped) == [0, 1, 2, 3]
-    
+
     # Check group 0 (minterm 0 -> [0,0,0,0])
     assert grouped[0] == [[false, false, false, false]]
-    
+
     # Check group 1 (minterms 1, 8)
     # 1 -> [0,0,0,1], 8 -> [1,0,0,0]
     expected_group_1 = [
       [false, false, false, true],
       [true, false, false, false]
     ]
+
     # Sort to compare ignoring order
     assert Enum.sort(grouped[1]) == Enum.sort(expected_group_1)
   end
 
   test "find_prime_implicants finds prime implicants correctly" do
     minterms = [0, 1, 2, 5, 6, 7]
-    grouped = QMC.group_minterms(minterms, 3)
-    {primes, _} = QMC.find_prime_implicants(grouped, 3)
+    primes = QMC.minimize(minterms, 3)
 
     # Expected prime implicants:
     # 0 (000), 1 (001) -> 00- (0,1) -> [false, false, :dont_care]
@@ -38,7 +38,7 @@ defmodule BooleanAlgebra.QMCTest do
     # 2 (010), 6 (110) -> -10 (2,6) -> [:dont_care, true, false]
     # 5 (101), 7 (111) -> 1-1 (5,7) -> [true, :dont_care, true]
     # 6 (110), 7 (111) -> 11- (6,7) -> [true, true, :dont_care]
-    
+
     assert Enum.member?(primes, [false, false, :dont_care])
     assert Enum.member?(primes, [false, :dont_care, false])
     assert Enum.member?(primes, [:dont_care, false, true])

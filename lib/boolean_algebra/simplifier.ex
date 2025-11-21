@@ -24,7 +24,7 @@ defmodule BooleanAlgebra.Simplifier do
   @doc """
   Given a Boolean AST, find the minimal expression using QMC and Petrick's method
   """
-  @spec simplify(AST.t()) :: AST.t()
+  @spec minimize(AST.t()) :: AST.t()
   def minimize(expr) do
     vars = AST.variables(expr)
 
@@ -37,14 +37,14 @@ defmodule BooleanAlgebra.Simplifier do
 
     # Handle empty minterms (expression always false)
     if minterms == [] do
-      {:const, false}
+      AST.const_node(false)
     else
+      # Use optimized QMC without step tracking
       prime_implicants = QMC.minimize(minterms, length(vars))
       coverage_map = QMC.coverage_table(prime_implicants, minterms, length(vars))
 
       minimal_covers = Petrick.minimal_cover(coverage_map)
 
-      # Select the first minimal cover (could be multiple)
       case minimal_covers do
         [first_set | _] -> first_set
         [] -> raise "No minimal covers found"
@@ -52,8 +52,54 @@ defmodule BooleanAlgebra.Simplifier do
       # Convert implicants back to AST
       |> Enum.map(&implicant_to_ast(&1, vars))
       # Combine implicants with OR
-      |> Enum.reduce(fn ast1, ast2 -> {:or, ast1, ast2} end)
+      |> Enum.reduce(fn ast1, ast2 -> AST.or_node(ast1, ast2) end)
     end
+  end
+
+  @doc """
+  Same as minimize/1 but returns details about the minimization process.
+  """
+  def minimize_with_details(expr) do
+    vars = AST.variables(expr)
+
+    minterms =
+      expr
+      |> TruthTable.from_ast()
+      |> Enum.with_index()
+      |> Enum.filter(fn {row, _idx} -> Map.get(row, :result) end)
+      |> Enum.map(fn {_row, idx} -> idx end)
+
+    # Handle empty minterms (expression always false)
+    if minterms == [] do
+      {{:const, false}, %{qmc_steps: [], prime_implicants: []}}
+    else
+      {prime_implicants, qmc_steps} = QMC.minimize_with_steps(minterms, length(vars))
+      coverage_map = QMC.coverage_table(prime_implicants, minterms, length(vars))
+
+      minimal_covers = Petrick.minimal_cover(coverage_map)
+
+      # Select the first minimal cover (could be multiple)
+      final_ast =
+        case minimal_covers do
+          [first_set | _] -> first_set
+          [] -> raise "No minimal covers found"
+        end
+        # Convert implicants back to AST
+        |> Enum.map(&implicant_to_ast(&1, vars))
+        # Combine implicants with OR
+        |> Enum.reduce(fn ast1, ast2 -> {:or, ast1, ast2} end)
+
+      {final_ast, %{qmc_steps: qmc_steps, prime_implicants: prime_implicants}}
+    end
+  end
+
+  @doc """
+  Simplifies a boolean expression and returns details.
+  """
+  def simplify_with_details(expr) do
+    {minimized_ast, details} = minimize_with_details(expr)
+    simplified_ast = apply_rules(minimized_ast)
+    {simplified_ast, details}
   end
 
   # Convert an implicant pattern (e.g., [true, :dont_care, false]) back to AST
@@ -75,10 +121,10 @@ defmodule BooleanAlgebra.Simplifier do
   end
 
   # ============================================================================
-  # ABSORPTION LAW WITH NEGATION: X + (¬X ∧ Y) = X + Y
+  # ABSORPTION LAW WITH NEGATION: X | (!X & Y) = X | Y
   # ============================================================================
 
-  # Pattern: ¬A ∨ (A ∧ B) = ¬A ∨ B
+  # Pattern: !A | (A & B) = !A | B
   defp apply_rules({:or, {:not, a1}, {:and, a2, b}}) when a1 == a2 do
     apply_rules({:or, {:not, a1}, b})
   end
@@ -87,7 +133,7 @@ defmodule BooleanAlgebra.Simplifier do
     apply_rules({:or, {:not, a1}, b})
   end
 
-  # Pattern: (A ∧ B) ∨ ¬A = ¬A ∨ B (commutative)
+  # Pattern: (A & B) | !A = !A | B (commutative)
   defp apply_rules({:or, {:and, a1, b}, {:not, a2}}) when a1 == a2 do
     apply_rules({:or, {:not, a2}, b})
   end
@@ -96,7 +142,7 @@ defmodule BooleanAlgebra.Simplifier do
     apply_rules({:or, {:not, a2}, b})
   end
 
-  # Pattern: A ∨ (¬A ∧ B) = A ∨ B
+  # Pattern: A | (!A & B) = A | B
   defp apply_rules({:or, a1, {:and, {:not, a2}, b}}) when a1 == a2 do
     apply_rules({:or, a1, b})
   end
@@ -105,7 +151,7 @@ defmodule BooleanAlgebra.Simplifier do
     apply_rules({:or, a1, b})
   end
 
-  # Pattern: (¬A ∧ B) ∨ A = A ∨ B (commutative)
+  # Pattern: (!A & B) | A = A | B (commutative)
   defp apply_rules({:or, {:and, {:not, a1}, b}, a2}) when a1 == a2 do
     apply_rules({:or, a2, b})
   end
@@ -115,28 +161,28 @@ defmodule BooleanAlgebra.Simplifier do
   end
 
   # ============================================================================
-  # NESTED OR PATTERNS: Handle (A ∧ B) ∨ ((A ∧ C) ∨ ¬A)
+  # NESTED OR PATTERNS: Handle (A & B) | ((A & C) | !A)
   # ============================================================================
 
-  # Pattern: (A ∧ B) ∨ ((A ∧ C) ∨ ¬A) - flatten and simplify
+  # Pattern: (A & B) | ((A & C) | !A) - flatten and simplify
   defp apply_rules({:or, {:and, a1, b}, {:or, {:and, a2, c}, {:not, a3}}})
        when a1 == a2 and a2 == a3 do
-    # This is: (A ∧ B) ∨ (A ∧ C) ∨ ¬A
-    # Factor: A(B ∨ C) ∨ ¬A = ¬A ∨ (B ∨ C)
+    # This is: (A & B) | (A & C) | !A
+    # Factor: A(B | C) | !A = !A | (B | C)
     apply_rules({:or, {:not, a3}, {:or, b, c}})
   end
 
-  # Pattern: (A ∧ B) ∨ (¬A ∨ (A ∧ C)) - different nesting order
+  # Pattern: (A & B) | (!A | (A & C)) - different nesting order
   defp apply_rules({:or, {:and, a1, b}, {:or, {:not, a2}, {:and, a3, c}}})
        when a1 == a2 and a2 == a3 do
     apply_rules({:or, {:not, a2}, {:or, b, c}})
   end
 
   # ============================================================================
-  # STANDARD ABSORPTION LAW: X ∨ (X ∧ Y) = X
+  # STANDARD ABSORPTION LAW: X | (X & Y) = X
   # ============================================================================
 
-  # Pattern: A ∨ (A ∧ B) = A
+  # Pattern: A | (A & B) = A
   defp apply_rules({:or, a1, {:and, a2, _b}}) when a1 == a2 do
     apply_rules(a1)
   end
@@ -145,7 +191,7 @@ defmodule BooleanAlgebra.Simplifier do
     apply_rules(a1)
   end
 
-  # Pattern: (A ∧ B) ∨ A = A (commutative)
+  # Pattern: (A & B) | A = A (commutative)
   defp apply_rules({:or, {:and, a1, _b}, a2}) when a1 == a2 do
     apply_rules(a2)
   end
@@ -154,7 +200,7 @@ defmodule BooleanAlgebra.Simplifier do
     apply_rules(a2)
   end
 
-  # Pattern: A ∧ (A ∨ B) = A
+  # Pattern: A & (A | B) = A
   defp apply_rules({:and, a1, {:or, a2, _b}}) when a1 == a2 do
     apply_rules(a1)
   end
@@ -163,7 +209,7 @@ defmodule BooleanAlgebra.Simplifier do
     apply_rules(a1)
   end
 
-  # Pattern: (A ∨ B) ∧ A = A (commutative)
+  # Pattern: (A | B) & A = A (commutative)
   defp apply_rules({:and, {:or, a1, _b}, a2}) when a1 == a2 do
     apply_rules(a2)
   end
@@ -199,4 +245,12 @@ defmodule BooleanAlgebra.Simplifier do
 
   defp apply_rules({:not, expr}), do: {:not, apply_rules(expr)}
   defp apply_rules(expr), do: expr
+
+  @doc """
+  Calculates the complexity of the expression based on the number of segments (literals).
+  """
+  def complexity({:var, _}), do: 1
+  def complexity({:const, _}), do: 1
+  def complexity({:not, expr}), do: complexity(expr)
+  def complexity({_op, left, right}), do: complexity(left) + complexity(right)
 end

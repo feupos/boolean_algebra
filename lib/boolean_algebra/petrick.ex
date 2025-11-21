@@ -13,10 +13,10 @@ defmodule BooleanAlgebra.Petrick do
   1. Reduce the Prime Implicant Chart by eliminating essential prime implicants (handled before this or part of the input).
   2. Label the rows of the reduced prime implicant chart (minterms).
   3. Form a logic function P which is the product of the sums of the prime implicants covering each minterm.
-     P = (PI_a + PI_b) * (PI_c + PI_d) ...
-     where (PI_a + PI_b) means minterm 1 is covered by PI_a OR PI_b.
-  4. Expand P into a Sum of Products (SOP) form using the distributive law: (X + Y)(Z + W) = XZ + XW + YZ + YW.
-  5. Simplify the result using X + XY = X (Absorption Law) to remove supersets.
+     P = (PI_a | PI_b) & (PI_c | PI_d) ...
+     where (PI_a | PI_b) means minterm 1 is covered by PI_a OR PI_b.
+  4. Expand P into a Sum of Products (SOP) form using the distributive law: (X | Y)(Z | W) = XZ | XW | YZ | YW.
+  5. Simplify the result using X | (X & Y) = X (Absorption Law) to remove supersets.
   6. Each resulting product term represents a valid cover. Choose the one with the fewest prime implicants.
   """
 
@@ -55,8 +55,8 @@ defmodule BooleanAlgebra.Petrick do
   end
 
   # Recursively multiplies the sum terms.
-  # Input: List of lists of MapSets. [[{A}, {B}], [{C}, {D}]] representing (A+B)(C+D)
-  # Output: List of MapSets. [{A,C}, {A,D}, {B,C}, {B,D}] representing AC + AD + BC + BD
+  # Input: List of lists of MapSets. [[{A}, {B}], [{C}, {D}]] representing (A | B) & (C | D)
+  # Output: List of MapSets. [{A,C}, {A,D}, {B,C}, {B,D}] representing (A & C) | (A & D) | (B & C) | (B & D)
   defp expand_pos_to_sop([first_sum | rest_sums]) do
     Enum.reduce(rest_sums, first_sum, &multiply_two_sums/2)
   end
@@ -64,7 +64,7 @@ defmodule BooleanAlgebra.Petrick do
   defp expand_pos_to_sop([]), do: []
 
   # Multiplies two sums (distributes).
-  # (A + B)(C + D) = AC + AD + BC + BD
+  # (A | B) & (C | D) = (A & C) | (A & D) | (B & C) | (B & D)
   # In our structure:
   # sum1 = [{A}, {B}]
   # sum2 = [{C}, {D}]
@@ -85,7 +85,8 @@ defmodule BooleanAlgebra.Petrick do
 
     Enum.reduce(sorted_covers, [], fn candidate, kept_covers ->
       # Check if 'candidate' is a superset of any already 'kept_covers'
-      is_redundant = Enum.any?(kept_covers, fn existing -> MapSet.subset?(existing, candidate) end)
+      is_redundant =
+        Enum.any?(kept_covers, fn existing -> MapSet.subset?(existing, candidate) end)
 
       if is_redundant do
         kept_covers

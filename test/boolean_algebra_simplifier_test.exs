@@ -2,580 +2,384 @@ defmodule BooleanAlgebraSimplifierTest do
   use ExUnit.Case
   doctest BooleanAlgebra
 
-  # , QMC, Petrick}
-  alias BooleanAlgebra.{AST, Simplifier, TruthTable}
+  alias BooleanAlgebra.{Simplifier, TruthTable}
+
+  # Helper to parse string expressions into AST
+  defp parse(expr) do
+    {:ok, ast} = BooleanAlgebra.parse(expr)
+    ast
+  end
+
+  # Helper to simplify string expressions directly
+  defp simplify(expr) do
+    expr
+    |> parse()
+    |> Simplifier.simplify()
+  end
 
   describe "basic expression simplification" do
     test "simplifies OR expressions" do
-      assert Simplifier.simplify(
-               AST.or_node(AST.var_node(:a), AST.or_node(AST.var_node(:b), AST.var_node(:a)))
-             ) ==
-               AST.or_node(AST.var_node(:a), AST.var_node(:b))
-
-      assert Simplifier.simplify(AST.or_node(AST.var_node(:a), AST.var_node(:b))) ==
-               AST.or_node(AST.var_node(:a), AST.var_node(:b))
-
-      assert Simplifier.simplify(AST.or_node(AST.var_node(:a), AST.const_node(false))) ==
-               AST.var_node(:a)
-
-      assert Simplifier.simplify(AST.or_node(AST.var_node(:a), AST.const_node(true))) ==
-               AST.const_node(true)
-
-      assert Simplifier.simplify(AST.or_node(AST.const_node(false), AST.const_node(false))) ==
-               AST.const_node(false)
-
-      assert Simplifier.simplify(AST.or_node(AST.const_node(true), AST.const_node(false))) ==
-               AST.const_node(true)
+      assert simplify("a | (b | a)") == parse("a | b")
+      assert simplify("a | b") == parse("a | b")
+      assert simplify("a | 0") == parse("a")
+      assert simplify("a | 1") == parse("1")
+      assert simplify("0 | 0") == parse("0")
+      assert simplify("1 | 0") == parse("1")
     end
 
     test "simplifies AND expressions" do
-      assert Simplifier.simplify(AST.and_node(AST.var_node(:a), AST.var_node(:b))) ==
-               AST.and_node(AST.var_node(:a), AST.var_node(:b))
-
-      assert Simplifier.simplify(AST.and_node(AST.var_node(:a), AST.const_node(false))) ==
-               AST.const_node(false)
-
-      assert Simplifier.simplify(AST.and_node(AST.var_node(:a), AST.const_node(true))) ==
-               AST.var_node(:a)
-
-      assert Simplifier.simplify(AST.and_node(AST.const_node(true), AST.const_node(true))) ==
-               AST.const_node(true)
-
-      assert Simplifier.simplify(AST.and_node(AST.const_node(false), AST.const_node(true))) ==
-               AST.const_node(false)
+      assert simplify("a & b") == parse("a & b")
+      assert simplify("a & 0") == parse("0")
+      assert simplify("a & 1") == parse("a")
+      assert simplify("1 & 1") == parse("1")
+      assert simplify("0 & 1") == parse("0")
     end
 
     test "simplifies NOT expressions" do
-      assert Simplifier.simplify(AST.not_node(AST.const_node(true))) == AST.const_node(false)
-      assert Simplifier.simplify(AST.not_node(AST.const_node(false))) == AST.const_node(true)
-
-      assert Simplifier.simplify(AST.not_node(AST.var_node(:a))) ==
-               AST.not_node(AST.var_node(:a))
+      assert simplify("!1") == parse("0")
+      assert simplify("!0") == parse("1")
+      assert simplify("!a") == parse("!a")
     end
 
     test "simplifies XOR expressions" do
-      assert Simplifier.simplify(AST.xor_node(AST.var_node(:a), AST.var_node(:b))) ==
-               AST.xor_node(AST.var_node(:a), AST.var_node(:b))
-
-      assert Simplifier.simplify(AST.xor_node(AST.var_node(:a), AST.const_node(false))) ==
-               AST.var_node(:a)
-
-      assert Simplifier.simplify(AST.xor_node(AST.var_node(:a), AST.const_node(true))) ==
-               AST.not_node(AST.var_node(:a))
-
-      assert Simplifier.simplify(AST.xor_node(AST.const_node(false), AST.const_node(false))) ==
-               AST.const_node(false)
-
-      assert Simplifier.simplify(AST.xor_node(AST.const_node(true), AST.const_node(true))) ==
-               AST.const_node(false)
-
-      assert Simplifier.simplify(AST.xor_node(AST.var_node(:a), AST.var_node(:a))) ==
-               AST.const_node(false)
+      assert simplify("a ^ b") == parse("a ^ b")
+      assert simplify("a ^ 0") == parse("a")
+      assert simplify("a ^ 1") == parse("!a")
+      assert simplify("0 ^ 0") == parse("0")
+      assert simplify("1 ^ 1") == parse("0")
+      assert simplify("a ^ a") == parse("0")
     end
   end
 
   describe "complex expression simplification" do
     test "simplifies nested expressions" do
-      complex_expr =
-        AST.or_node(
-          AST.and_node(AST.var_node(:a), AST.const_node(true)),
-          AST.const_node(false)
-        )
-
-      assert Simplifier.simplify(complex_expr) == AST.var_node(:a)
+      assert simplify("(a & 1) | 0") == parse("a")
     end
 
     test "simplifies expressions with double negation" do
-      double_not = AST.not_node(AST.not_node(AST.var_node(:a)))
-      assert Simplifier.simplify(double_not) == AST.var_node(:a)
+      assert simplify("!!a") == parse("a")
     end
 
     test "simplifies complex expressions with multiple operations" do
-      complex_expr =
-        AST.and_node(
-          AST.or_node(AST.var_node(:a), AST.const_node(false)),
-          AST.not_node(AST.const_node(false))
-        )
-
-      assert Simplifier.simplify(complex_expr) == AST.var_node(:a)
+      assert simplify("(a | 0) & !0") == parse("a")
     end
   end
 
   describe "identity and absorption laws" do
     test "applies OR identity law" do
-      expr = AST.or_node(AST.var_node(:a), AST.var_node(:a))
-      assert Simplifier.simplify(expr) == AST.var_node(:a)
+      assert simplify("a | a") == parse("a")
     end
 
     test "applies AND identity law" do
-      expr = AST.and_node(AST.var_node(:a), AST.var_node(:a))
-      assert Simplifier.simplify(expr) == AST.var_node(:a)
+      assert simplify("a & a") == parse("a")
     end
   end
 
   describe "de morgan's laws" do
-    test "NOT (a AND b) = NOT a OR NOT b" do
-      expr = AST.not_node(AST.and_node(AST.var_node(:a), AST.var_node(:b)))
-      expected = AST.or_node(AST.not_node(AST.var_node(:a)), AST.not_node(AST.var_node(:b)))
-      assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
+    test "!(a & b) = !a | !b" do
+      assert simplify("!(a & b)") == simplify("!a | !b")
     end
 
-    test "NOT (a OR b) = NOT a AND NOT b" do
-      expr = AST.not_node(AST.or_node(AST.var_node(:a), AST.var_node(:b)))
-      expected = AST.and_node(AST.not_node(AST.var_node(:a)), AST.not_node(AST.var_node(:b)))
-      assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
+    test "!(a | b) = !a & !b" do
+      assert simplify("!(a | b)") == simplify("!a & !b")
     end
 
     test "de morgan's laws with constants" do
-      expr1 = AST.not_node(AST.and_node(AST.var_node(:a), AST.const_node(true)))
-      expr2 = AST.not_node(AST.or_node(AST.var_node(:a), AST.const_node(false)))
-
-      assert Simplifier.simplify(expr1) == AST.not_node(AST.var_node(:a))
-      assert Simplifier.simplify(expr2) == AST.not_node(AST.var_node(:a))
+      assert simplify("!(a & 1)") == parse("!a")
+      assert simplify("!(a | 0)") == parse("!a")
     end
   end
 
   describe "absorption rules" do
-    test "OR absorption: a OR (a AND b) = a" do
-      expr =
-        AST.or_node(
-          AST.var_node(:a),
-          AST.and_node(AST.var_node(:a), AST.var_node(:b))
-        )
-
-      assert Simplifier.simplify(expr) == AST.var_node(:a)
+    test "OR absorption: a | (a & b) = a" do
+      assert simplify("a | (a & b)") == parse("a")
     end
 
-    test "AND absorption: a AND (a OR b) = a" do
-      expr =
-        AST.and_node(
-          AST.var_node(:a),
-          AST.or_node(AST.var_node(:a), AST.var_node(:b))
-        )
-
-      assert Simplifier.simplify(expr) == AST.var_node(:a)
+    test "AND absorption: a & (a | b) = a" do
+      assert simplify("a & (a | b)") == parse("a")
     end
 
     test "absorption rules with constants" do
-      expr1 =
-        AST.or_node(
-          AST.var_node(:a),
-          AST.and_node(AST.var_node(:a), AST.const_node(true))
-        )
-
-      expr2 =
-        AST.and_node(
-          AST.var_node(:a),
-          AST.or_node(AST.var_node(:a), AST.const_node(false))
-        )
-
-      assert Simplifier.simplify(expr1) == AST.var_node(:a)
-      assert Simplifier.simplify(expr2) == AST.var_node(:a)
+      assert simplify("a | (a & 1)") == parse("a")
+      assert simplify("a & (a | 0)") == parse("a")
     end
   end
 
   describe "test contradictions and permutation absorption" do
-    test "a AND NOT a = 0 (both orders)" do
-      assert Simplifier.simplify(AST.and_node(AST.var_node(:a), AST.not_node(AST.var_node(:a)))) ==
-               AST.const_node(false)
-
-      assert Simplifier.simplify(AST.and_node(AST.not_node(AST.var_node(:a)), AST.var_node(:a))) ==
-               AST.const_node(false)
+    test "a & !a = 0 (both orders)" do
+      assert simplify("a & !a") == parse("0")
+      assert simplify("!a & a") == parse("0")
     end
 
-    test "a OR NOT a = 1 (both orders)" do
-      assert Simplifier.simplify(AST.or_node(AST.var_node(:a), AST.not_node(AST.var_node(:a)))) ==
-               AST.const_node(true)
-
-      assert Simplifier.simplify(AST.or_node(AST.not_node(AST.var_node(:a)), AST.var_node(:a))) ==
-               AST.const_node(true)
+    test "a | !a = 1 (both orders)" do
+      assert simplify("a | !a") == parse("1")
+      assert simplify("!a | a") == parse("1")
     end
 
     test "AND absorption with OR where common term is in different positions" do
-      expr1 =
-        AST.and_node(
-          AST.var_node(:a),
-          AST.or_node(AST.var_node(:b), AST.var_node(:a))
-        )
-
-      expr2 =
-        AST.and_node(
-          AST.or_node(AST.var_node(:b), AST.var_node(:a)),
-          AST.var_node(:a)
-        )
-
-      expr3 =
-        AST.and_node(
-          AST.or_node(AST.var_node(:b), AST.var_node(:a)),
-          AST.var_node(:b)
-        )
-
-      assert Simplifier.simplify(expr1) == AST.var_node(:a)
-      assert Simplifier.simplify(expr2) == AST.var_node(:a)
-      assert Simplifier.simplify(expr3) == AST.var_node(:b)
+      assert simplify("a & (b | a)") == parse("a")
+      assert simplify("(b | a) & a") == parse("a")
+      assert simplify("(b | a) & b") == parse("b")
     end
 
     test "OR absorption with AND where common term is in different positions" do
-      expr1 =
-        AST.or_node(
-          AST.var_node(:a),
-          AST.and_node(AST.var_node(:b), AST.var_node(:a))
-        )
-
-      expr2 =
-        AST.or_node(
-          AST.and_node(AST.var_node(:b), AST.var_node(:a)),
-          AST.var_node(:a)
-        )
-
-      expr3 =
-        AST.or_node(
-          AST.and_node(AST.var_node(:b), AST.var_node(:a)),
-          AST.var_node(:b)
-        )
-
-      assert Simplifier.simplify(expr1) == AST.var_node(:a)
-      assert Simplifier.simplify(expr2) == AST.var_node(:a)
-      assert Simplifier.simplify(expr3) == AST.var_node(:b)
+      assert simplify("a | (b & a)") == parse("a")
+      assert simplify("(b & a) | a") == parse("a")
+      assert simplify("(b & a) | b") == parse("b")
     end
   end
 
   describe "advanced expression simplification" do
     test "removes duplicates in multiple nested OR expressions" do
-      expr =
-        AST.or_node(
-          AST.var_node(:a),
-          AST.or_node(
-            AST.var_node(:b),
-            AST.or_node(AST.var_node(:a), AST.var_node(:c))
-          )
-        )
+      expr = "a | (b | (a | c))"
+      expected = "a | (b | c)"
 
-      expected =
-        AST.or_node(
-          AST.var_node(:a),
-          AST.or_node(AST.var_node(:b), AST.var_node(:c))
-        )
+      simplified = simplify(expr)
+      expected_ast = parse(expected)
 
-      assert Simplifier.simplify(expr) == expected
-      assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
+      assert simplified == expected_ast
+      assert TruthTable.from_ast(simplified) == TruthTable.from_ast(expected_ast)
     end
 
     test "removes duplicates in multiple nested AND expressions" do
-      expr =
-        AST.and_node(
-          AST.var_node(:a),
-          AST.and_node(
-            AST.var_node(:b),
-            AST.and_node(AST.var_node(:a), AST.var_node(:c))
-          )
-        )
+      expr = "a & (b & (a & c))"
+      expected = "a & (b & c)"
 
-      expected =
-        AST.and_node(
-          AST.var_node(:a),
-          AST.and_node(AST.var_node(:b), AST.var_node(:c))
-        )
+      simplified = simplify(expr)
+      # simplify expected too as it might normalize
+      expected_ast = simplify(expected)
 
-      assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
-      assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
+      assert simplified == expected_ast
+      assert TruthTable.from_ast(simplified) == TruthTable.from_ast(expected_ast)
     end
 
     test "associative flattening and simplification in mixed expressions" do
-      expr =
-        AST.or_node(
-          AST.var_node(:a),
-          AST.or_node(
-            AST.and_node(AST.var_node(:b), AST.const_node(true)),
-            AST.or_node(AST.var_node(:a), AST.const_node(false))
-          )
-        )
+      expr = "a | ((b & 1) | (a | 0))"
+      expected = "a | b"
 
-      expected =
-        AST.or_node(
-          AST.var_node(:a),
-          AST.var_node(:b)
-        )
+      simplified = simplify(expr)
+      expected_ast = parse(expected)
 
-      assert Simplifier.simplify(expr) == expected
-      assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
+      assert simplified == expected_ast
+      assert TruthTable.from_ast(simplified) == TruthTable.from_ast(expected_ast)
     end
 
     test "de morgan's law nested with absorption and duplicates" do
-      expr =
-        AST.not_node(
-          AST.and_node(
-            AST.or_node(AST.var_node(:a), AST.const_node(false)),
-            AST.var_node(:a)
-          )
-        )
+      expr = "!((a | 0) & a)"
+      # !a | !a -> !a
+      expected = "!a"
 
-      expected =
-        AST.or_node(
-          AST.not_node(AST.var_node(:a)),
-          AST.not_node(AST.var_node(:a))
-        )
-        |> Simplifier.simplify()
+      simplified = simplify(expr)
+      expected_ast = parse(expected)
 
-      assert Simplifier.simplify(expr) == expected
-      assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
+      assert simplified == expected_ast
+      assert TruthTable.from_ast(simplified) == TruthTable.from_ast(expected_ast)
     end
 
     test "complex nested negations with absorption and identity" do
-      expr =
-        AST.not_node(
-          AST.or_node(
-            AST.and_node(AST.var_node(:a), AST.var_node(:b)),
-            AST.and_node(AST.var_node(:a), AST.var_node(:b))
-          )
-        )
+      expr = "!((a & b) | (a & b))"
+      expected = "!a | !b"
 
-      expected =
-        AST.or_node(AST.not_node(AST.var_node(:a)), AST.not_node(AST.var_node(:b)))
+      simplified = simplify(expr)
+      expected_ast = parse(expected)
 
-      assert Simplifier.simplify(expr) == expected
-      assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
+      assert simplified == expected_ast
+      assert TruthTable.from_ast(simplified) == TruthTable.from_ast(expected_ast)
     end
   end
 
   describe "absorption and complex expression tests" do
-    test "simplifies NOT A OR (B OR C) OR (B AND C)" do
-      expr =
-        AST.or_node(
-          AST.or_node(
-            AST.not_node(AST.var_node(:a)),
-            AST.or_node(AST.var_node(:b), AST.var_node(:c))
-          ),
-          AST.and_node(AST.var_node(:b), AST.var_node(:c))
-        )
-
-      # Expected simplification is:
-      # NOT A OR B OR C (since (B AND C) absorbed by (B OR C))
-      expected =
-        AST.or_node(
-          AST.not_node(AST.var_node(:a)),
-          AST.or_node(AST.var_node(:b), AST.var_node(:c))
-        )
-
-      assert Simplifier.simplify(expr) == expected
+    test "simplifies !a | (b | c) | (b & c)" do
+      # (b & c) absorbed by (b | c)
+      assert simplify("(!a | (b | c)) | (b & c)") == parse("!a | (b | c)")
     end
 
     test "absorption works regardless of operand order" do
-      expr1 =
-        AST.or_node(
-          AST.and_node(AST.var_node(:b), AST.var_node(:c)),
-          AST.or_node(AST.var_node(:b), AST.var_node(:c))
-        )
-
-      expr2 =
-        AST.or_node(
-          AST.or_node(AST.var_node(:b), AST.var_node(:c)),
-          AST.and_node(AST.var_node(:b), AST.var_node(:c))
-        )
-
-      expected =
-        AST.or_node(AST.var_node(:b), AST.var_node(:c))
-
-      assert Simplifier.simplify(expr1) == expected
-      assert Simplifier.simplify(expr2) == expected
+      expected = parse("b | c")
+      assert simplify("(b & c) | (b | c)") == expected
+      assert simplify("(b | c) | (b & c)") == expected
     end
 
     test "distribution combined with absorption" do
-      expr =
-        AST.and_node(
-          AST.var_node(:a),
-          AST.or_node(AST.var_node(:a), AST.var_node(:b))
-        )
-
-      # By absorption: a AND (a OR b) = a
-      expected = AST.var_node(:a)
-
-      assert Simplifier.simplify(expr) == expected
+      # a & (a | b) = a
+      assert simplify("a & (a | b)") == parse("a")
     end
 
     test "double negation simplification in complex OR expressions" do
-      expr =
-        AST.or_node(
-          AST.not_node(AST.not_node(AST.var_node(:a))),
-          AST.and_node(AST.var_node(:b), AST.const_node(true))
-        )
-
-      expected =
-        AST.or_node(
-          AST.var_node(:a),
-          AST.var_node(:b)
-        )
-
-      assert Simplifier.simplify(expr) == expected
+      assert simplify("!!a | (b & 1)") == parse("a | b")
     end
   end
 
   describe "Standard Boolean Algebra Laws and Theorems" do
-    # Reference: https://www.electronics-tutorials.ws/boolean/bool_6.html
-
     test "Consensus Theorem: AB + !AC + BC = AB + !AC" do
-      # The term BC is redundant because if A is true, B must be true (from AB),
-      # and if A is false, C must be true (from !AC).
-      expr =
-        AST.or_node(
-          AST.or_node(
-            AST.and_node(AST.var_node(:a), AST.var_node(:b)),
-            AST.and_node(AST.not_node(AST.var_node(:a)), AST.var_node(:c))
-          ),
-          AST.and_node(AST.var_node(:b), AST.var_node(:c))
-        )
-
-      expected =
-        AST.or_node(
-          AST.and_node(AST.var_node(:a), AST.var_node(:b)),
-          AST.and_node(AST.not_node(AST.var_node(:a)), AST.var_node(:c))
-        )
-
-      assert Simplifier.simplify(expr) == expected
+      assert simplify("(a & b) | (!a & c) | (b & c)") == parse("(a & b) | (!a & c)")
     end
 
     test "Distributive Law (Reverse): (A + B)(A + C) = A + BC" do
-      expr =
-        AST.and_node(
-          AST.or_node(AST.var_node(:a), AST.var_node(:b)),
-          AST.or_node(AST.var_node(:a), AST.var_node(:c))
-        )
-
-      expected =
-        AST.or_node(
-          AST.var_node(:a),
-          AST.and_node(AST.var_node(:b), AST.var_node(:c))
-        )
-
-      assert Simplifier.simplify(expr) == expected
+      assert simplify("(a | b) & (a | c)") == parse("a | (b & c)")
     end
 
     test "Redundancy Law: A + !AB = A + B" do
-      expr =
-        AST.or_node(
-          AST.var_node(:a),
-          AST.and_node(AST.not_node(AST.var_node(:a)), AST.var_node(:b))
-        )
-
-      expected = AST.or_node(AST.var_node(:a), AST.var_node(:b))
-
-      assert Simplifier.simplify(expr) == expected
+      assert simplify("a | (!a & b)") == parse("a | b")
     end
 
     test "Redundancy Law (Dual): A(!A + B) = AB" do
-      expr =
-        AST.and_node(
-          AST.var_node(:a),
-          AST.or_node(AST.not_node(AST.var_node(:a)), AST.var_node(:b))
-        )
-
-      expected = AST.and_node(AST.var_node(:a), AST.var_node(:b))
-
-      assert Simplifier.simplify(expr) == expected
+      assert simplify("a & (!a | b)") == parse("a & b")
     end
 
     test "Absorption Law: A(A + B) = A" do
-      expr =
-        AST.and_node(
-          AST.var_node(:a),
-          AST.or_node(AST.var_node(:a), AST.var_node(:b))
-        )
-
-      expected = AST.var_node(:a)
-
-      assert Simplifier.simplify(expr) == expected
+      assert simplify("a & (a | b)") == parse("a")
     end
 
     test "Simplification of (A + B)(A + !B) = A" do
-      expr =
-        AST.and_node(
-          AST.or_node(AST.var_node(:a), AST.var_node(:b)),
-          AST.or_node(AST.var_node(:a), AST.not_node(AST.var_node(:b)))
-        )
-
-      expected = AST.var_node(:a)
-
-      assert Simplifier.simplify(expr) == expected
+      assert simplify("(a | b) & (a | !b)") == parse("a")
     end
 
     test "Dual Consensus Theorem: (A + B)(!A + C)(B + C) = (A + B)(!A + C)" do
-      # Reference: https://www.geeksforgeeks.org/consensus-theorem-in-digital-logic/
-      expr =
-        AST.and_node(
-          AST.and_node(
-            AST.or_node(AST.var_node(:a), AST.var_node(:b)),
-            AST.or_node(AST.not_node(AST.var_node(:a)), AST.var_node(:c))
-          ),
-          AST.or_node(AST.var_node(:b), AST.var_node(:c))
-        )
-
-      expected =
-        AST.and_node(
-          AST.or_node(AST.var_node(:a), AST.var_node(:b)),
-          AST.or_node(AST.not_node(AST.var_node(:a)), AST.var_node(:c))
-        )
-
-      assert Simplifier.simplify(expr) == Simplifier.simplify(expected)
+      expr = "(a | b) & (!a | c) & (b | c)"
+      expected = "(a | b) & (!a | c)"
+      assert simplify(expr) == simplify(expected)
     end
 
     test "Transposition Theorem: AB + !AC = (A + C)(!A + B)" do
-      # Reference: https://www.tutorialspoint.com/digital_circuits/digital_circuits_boolean_algebra.htm
-      # Note: The simplifier might prefer SOP form (AB + !AC) over POS ((A+C)(!A+B)).
-      # So we check if simplifying the POS form results in the SOP form.
-      expr_pos =
-        AST.and_node(
-          AST.or_node(AST.var_node(:a), AST.var_node(:c)),
-          AST.or_node(AST.not_node(AST.var_node(:a)), AST.var_node(:b))
-        )
-
-      expected_sop =
-        AST.or_node(
-          AST.and_node(AST.var_node(:a), AST.var_node(:b)),
-          AST.and_node(AST.not_node(AST.var_node(:a)), AST.var_node(:c))
-        )
-
-      assert Simplifier.simplify(expr_pos) == expected_sop
+      # SOP form preference check
+      assert simplify("(a | c) & (!a | b)") == parse("(a & b) | (!a & c)")
     end
 
     test "Complex Simplification: AB + A(B + C) + B(B + C) = B + AC" do
-      # AB + AB + AC + B + BC = AB + AC + B = B + AC
-      expr =
-        AST.or_node(
-          AST.or_node(
-            AST.and_node(AST.var_node(:a), AST.var_node(:b)),
-            AST.and_node(AST.var_node(:a), AST.or_node(AST.var_node(:b), AST.var_node(:c)))
-          ),
-          AST.and_node(AST.var_node(:b), AST.or_node(AST.var_node(:b), AST.var_node(:c)))
-        )
-
-      expected = AST.or_node(AST.and_node(AST.var_node(:a), AST.var_node(:c)), AST.var_node(:b))
-
-      assert Simplifier.simplify(expr) == expected
+      expr = "(a & b) | (a & (b | c)) | (b & (b | c))"
+      expected = "(a & c) | b"
+      assert simplify(expr) == parse(expected)
     end
   end
 
   describe "5-variable simplification" do
-    # Example from https://math.stackexchange.com/questions/412941/boolean-simplification-5-variables
     @tag :slow
     test "simplifies (xyz+uv)*((x+!y+!z)+uv) to xyz+uv" do
-      x = AST.var_node(:x)
-      y = AST.var_node(:y)
-      z = AST.var_node(:z)
-      u = AST.var_node(:u)
-      v = AST.var_node(:v)
-      xyz = AST.and_node(x, AST.and_node(y, z))
-      uv = AST.and_node(u, v)
-      left_term = AST.or_node(xyz, uv)
-      not_y = AST.not_node(y)
-      not_z = AST.not_node(z)
-      x_or_not_y_or_not_z = AST.or_node(x, AST.or_node(not_y, not_z))
-      right_term = AST.or_node(x_or_not_y_or_not_z, uv)
-      expr = AST.and_node(left_term, right_term)
+      expr = "((x & y & z) | (u & v)) & ((x | !y | !z) | (u & v))"
+      expected = "(u & v) | (x & (y & z))"
 
-      # Now try the actual simplification
-      expected = AST.or_node(uv, xyz)
-      assert TruthTable.from_ast(expr) == TruthTable.from_ast(expected)
-      assert Simplifier.simplify(expr) == expected
+      simplified = simplify(expr)
+      expected_ast = parse(expected)
+
+      assert TruthTable.from_ast(simplified) == TruthTable.from_ast(expected_ast)
+      assert simplified == expected_ast
+    end
+
+    # @tag :slow
+    # test "simplifies A&!B&E + !(B&C)&D&!E + !(C&D)&E+!A&D&!E + A&!(C&D)&E + A&E + A&B&!E + !(A&C) + B&C&!D to !A + B + !C + D + E" do
+    #   expr =
+    #     "A&!B&E | !(B&C)&D&!E | !(C&D)&E|!A&D&!E | A&!(C&D)&E | A&E | A&B&!E | !(A&C) | B&C&!D"
+
+    #   expected = "!A | B | !C | D | E"
+
+    #   simplified = simplify(expr)
+    #   expected_ast = parse(expected)
+
+    #   assert TruthTable.from_ast(simplified) == TruthTable.from_ast(expected_ast)
+    #   assert simplified == expected_ast
+    # end
+  end
+
+  describe "XOR permutations" do
+    test "simplifies (!A & B) | (!B & A) -> A ^ B" do
+      assert simplify("(!a & b) | (!b & a)") == parse("a ^ b")
+    end
+
+    test "simplifies (!A & B) | (A & !B) -> A ^ B" do
+      assert simplify("(!a & b) | (a & !b)") == parse("a ^ b")
+    end
+
+    test "simplifies (A & !B) | (!A & B) -> A ^ B" do
+      assert simplify("(a & !b) | (!a & b)") == parse("a ^ b")
+    end
+
+    test "simplifies (A & !B) | (B & !A) -> A ^ B" do
+      assert simplify("(a & !b) | (b & !a)") == parse("a ^ b")
+    end
+  end
+
+  describe "nested OR patterns" do
+    test "simplifies (A & B) | ((A & C) | !A)" do
+      assert simplify("(a & b) | ((a & c) | !a)") == parse("!a | (b | c)")
+    end
+
+    test "simplifies (A & B) | (!A | (A & C))" do
+      assert simplify("(a & b) | (!a | (a & c))") == parse("!a | (b | c)")
+    end
+  end
+
+  describe "Systematic Rule Coverage" do
+    # 1. Absorption with negation: !A | (A & B) = !A | B
+    test "rule 1: !A | (A & B)" do
+      assert simplify("!a | (a & b)") == parse("!a | b")
+    end
+
+    test "rule 2: !A | (B & A)" do
+      assert simplify("!a | (b & a)") == parse("!a | b")
+    end
+
+    # 2. (A & B) | !A = !A | B
+    test "rule 3: (A & B) | !A" do
+      assert simplify("(a & b) | !a") == parse("!a | b")
+    end
+
+    test "rule 4: (B & A) | !A" do
+      assert simplify("(b & a) | !a") == parse("!a | b")
+    end
+
+    # 3. A | (!A & B) = A | B
+    test "rule 5: A | (!A & B)" do
+      assert simplify("a | (!a & b)") == parse("a | b")
+    end
+
+    test "rule 6: A | (B & !A)" do
+      assert simplify("a | (b & !a)") == parse("a | b")
+    end
+
+    # 4. (!A & B) | A = A | B
+    test "rule 7: (!A & B) | A" do
+      assert simplify("(!a & b) | a") == parse("a | b")
+    end
+
+    test "rule 8: (B & !A) | A" do
+      assert simplify("(b & !a) | a") == parse("a | b")
+    end
+
+    # 5. Standard Absorption: A | (A & B) = A
+    test "rule 9: A | (A & B)" do
+      assert simplify("a | (a & b)") == parse("a")
+    end
+
+    test "rule 10: A | (B & A)" do
+      assert simplify("a | (b & a)") == parse("a")
+    end
+
+    # 6. (A & B) | A = A
+    test "rule 11: (A & B) | A" do
+      assert simplify("(a & b) | a") == parse("a")
+    end
+
+    test "rule 12: (B & A) | A" do
+      assert simplify("(b & a) | a") == parse("a")
+    end
+
+    # 7. A & (A | B) = A
+    test "rule 13: A & (A | B)" do
+      assert simplify("a & (a | b)") == parse("a")
+    end
+
+    test "rule 14: A & (B | A)" do
+      assert simplify("a & (b | a)") == parse("a")
+    end
+
+    # 8. (A | B) & A = A
+    test "rule 15: (A | B) & A" do
+      assert simplify("(a | b) & a") == parse("a")
+    end
+
+    test "rule 16: (B | A) & A" do
+      assert simplify("(b | a) & a") == parse("a")
     end
   end
 end

@@ -61,6 +61,7 @@ defmodule BooleanAlgebra.Parser do
   end
 
   defp parse_unary([]), do: {:error, "Unexpected end of expression"}
+  defp parse_unary([token | _]), do: {:error, "Unexpected token: #{inspect(token)}"}
 
   # Operator precedence (higher = tighter binding)
   defp precedence(:or), do: 1
