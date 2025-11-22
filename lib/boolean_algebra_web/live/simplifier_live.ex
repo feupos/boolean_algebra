@@ -11,7 +11,6 @@ defmodule BooleanAlgebraWeb.SimplifierLive do
        truth_table: [],
        error: nil,
        active_tab: :simplification,
-       format: :word,
        loading: false
      )}
   end
@@ -21,7 +20,7 @@ defmodule BooleanAlgebraWeb.SimplifierLive do
   end
 
   def handle_event("simplify", %{"expression" => expr}, socket) do
-    send(self(), {:run_simplification, expr, socket.assigns.format})
+    send(self(), {:run_simplification, expr})
     {:noreply, assign(socket, loading: true, input: expr)}
   end
 
@@ -29,16 +28,13 @@ defmodule BooleanAlgebraWeb.SimplifierLive do
     {:noreply, assign(socket, active_tab: String.to_existing_atom(tab))}
   end
 
-  def handle_event("set_format", %{"format" => format}, socket) do
-    format_atom = String.to_existing_atom(format)
-    {:noreply, assign(socket, format: format_atom)}
+
+
+  def handle_info({:run_simplification, expr}, socket) do
+    simplify(socket, expr)
   end
 
-  def handle_info({:run_simplification, expr, format}, socket) do
-    simplify(socket, expr, format)
-  end
-
-  defp simplify(socket, expr, format) do
+  defp simplify(socket, expr) do
     # Clear error when input is empty
     if String.trim(expr) == "" do
       {:noreply,
@@ -48,11 +44,10 @@ defmodule BooleanAlgebraWeb.SimplifierLive do
          details: nil,
          truth_table: [],
          error: nil,
-         format: format,
          loading: false
        )}
     else
-      case BooleanAlgebra.process(expr, operators: format, parentheses: :full) do
+      case BooleanAlgebra.process(expr, operators: :symbolic, parentheses: :minimal) do
         {:ok, result} ->
           {:noreply,
            assign(socket,
@@ -61,7 +56,6 @@ defmodule BooleanAlgebraWeb.SimplifierLive do
              details: result.details,
              truth_table: result.truth_table,
              error: nil,
-             format: format,
              loading: false
            )}
 
@@ -73,7 +67,6 @@ defmodule BooleanAlgebraWeb.SimplifierLive do
              details: nil,
              truth_table: [],
              error: reason,
-             format: format,
              loading: false
            )}
       end

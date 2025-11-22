@@ -492,4 +492,27 @@ defmodule BooleanAlgebraSimplifierTest do
       assert simplify("a & b") == parse("a & b")
     end
   end
+
+  describe "demonstration cases" do
+      # Reference to compare QMC with https://www.geeksforgeeks.org/digital-logic/quine-mccluskey-method/
+
+    test "simplify (!B & !C) | (!A & !D) | (A & D) | ((!B & !C) & (!A | D)) | ((!A & !D) & (B | !C)) | ((A & D) & (!B | C))" do
+      assert simplify("(!b & !c) | (!a & !d) | (a & d) | ((!b & !c) & (!a | d)) | ((!a & !d) & (b | !c)) | ((a & d) & (!b | c))") == parse("!a & !d | a & d | !b & !c")
+    end
+
+    # Reference to compare QMC with https://en.wikipedia.org/wiki/Quine%E2%80%93McCluskey_algorithm
+    # Minterms: [4, 8, 10, 11, 12, 15], Don't cares: [9, 14]
+    test "simplify with don't cares (Wikipedia QMC example)" do
+      # Including don't cares as minterms allows for better minimization
+      simplified = simplify("!a&b&!c&!d | a&!b&!c&!d | a&!b&!c&d | a&!b&c&!d | a&!b&c&d | a&b&!c&!d | a&b&c&!d | a&b&c&d")
+      expected = simplify("a&!b | a&c | b&!c&!d")
+
+      # Compare ASTs since parsed expressions may differ
+      assert simplified == expected
+
+      # Compare truth tables since AST structure may differ
+      assert TruthTable.from_ast(simplified) == TruthTable.from_ast(expected)
+    end
+  end
+
 end

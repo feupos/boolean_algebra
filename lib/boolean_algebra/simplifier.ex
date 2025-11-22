@@ -39,7 +39,15 @@ defmodule BooleanAlgebra.Simplifier do
 
     # Handle empty minterms (expression always false)
     if minterms == [] do
-      {{:const, false}, %{qmc_steps: [], prime_implicants: []}}
+      {{:const, false}, %{
+        qmc_steps: [],
+        prime_implicants: [],
+        minterms: [],
+        variables: vars,
+        coverage_map: %{},
+        minimal_covers: [],
+        selected_cover: MapSet.new()
+      }}
     else
       # Use QMC with step tracking as we always want details now
       {prime_implicants, qmc_steps} = QMC.prime_implicants(minterms, length(vars))
@@ -55,14 +63,18 @@ defmodule BooleanAlgebra.Simplifier do
 
           covers ->
             Enum.min_by(covers, fn cover ->
-              Enum.reduce(cover, 0, fn pi, acc ->
+              cover_list = MapSet.to_list(cover)
+              Enum.reduce(cover_list, 0, fn pi, acc ->
                 acc + Enum.count(pi, &(&1 != :dont_care))
               end)
             end)
         end
 
+      # Convert best_cover to list for AST generation
+      best_cover_list = MapSet.to_list(best_cover)
+
       final_ast =
-        best_cover
+        best_cover_list
         # Convert implicants back to AST
         |> Enum.map(&implicant_to_ast(&1, vars))
         # Sort by variables to ensure deterministic order
@@ -70,7 +82,15 @@ defmodule BooleanAlgebra.Simplifier do
         # Combine implicants with OR (left-associative)
         |> Enum.reduce(fn element, acc -> AST.or_node(acc, element) end)
 
-      {final_ast, %{qmc_steps: qmc_steps, prime_implicants: prime_implicants}}
+      {final_ast, %{
+        qmc_steps: qmc_steps,
+        prime_implicants: prime_implicants,
+        minterms: minterms,
+        variables: vars,
+        coverage_map: coverage_map,
+        minimal_covers: minimal_covers,
+        selected_cover: best_cover
+      }}
     end
   end
 

@@ -23,46 +23,10 @@
                 name="expression"
                 rows="3"
                 class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-lg font-mono text-slate-800 placeholder-slate-400 shadow-sm disabled:bg-slate-100 disabled:text-slate-500"
-                placeholder="e.g. A AND B OR (C AND NOT A)"
+                placeholder="e.g. a & b | (c & !a)"
                 spellcheck="false"
                 disabled={@loading}
               ><%= @input %></textarea>
-              <div class="absolute bottom-3 right-3 flex items-center space-x-4">
-                <div class="flex items-center space-x-2 bg-slate-100 rounded-lg p-1">
-                  <button
-                    type="button"
-                    phx-click="set_format"
-                    phx-value-format="word"
-                    disabled={@loading}
-                    class={[
-                      "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                      if(@format == :word,
-                        do: "bg-white text-blue-600 shadow-sm",
-                        else: "text-slate-500 hover:text-slate-700"
-                      ),
-                      if(@loading, do: "opacity-50 cursor-not-allowed")
-                    ]}
-                  >
-                    Word (AND)
-                  </button>
-                  <button
-                    type="button"
-                    phx-click="set_format"
-                    phx-value-format="symbolic"
-                    disabled={@loading}
-                    class={[
-                      "px-3 py-1 text-xs font-medium rounded-md transition-colors",
-                      if(@format == :symbolic,
-                        do: "bg-white text-blue-600 shadow-sm",
-                        else: "text-slate-500 hover:text-slate-700"
-                      ),
-                      if(@loading, do: "opacity-50 cursor-not-allowed")
-                    ]}
-                  >
-                    Symbolic (&)
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -255,6 +219,57 @@
           <% :steps -> %>
             <div class="animate-fade-in space-y-8">
               <%= if @details do %>
+                <!-- Minterms Section -->
+                <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                  <div class="bg-indigo-50 px-6 py-4 border-b border-indigo-200">
+                    <h3 class="font-bold text-indigo-900">Input Information</h3>
+                  </div>
+                  <div class="p-6 space-y-4">
+                    <!-- Variables -->
+                    <div>
+                      <h4 class="text-sm font-semibold text-slate-700 mb-2">Variables</h4>
+                      <div class="flex flex-wrap gap-2">
+                        <%= for var <- @details.variables do %>
+                          <span class="font-mono bg-indigo-100 text-indigo-700 px-3 py-1 rounded-lg border border-indigo-200">
+                            {var}
+                          </span>
+                        <% end %>
+                      </div>
+                    </div>
+                    
+                    <!-- Minterms -->
+                    <div>
+                      <h4 class="text-sm font-semibold text-slate-700 mb-2">Minterms (rows where result = 1)</h4>
+                      <%= if @details.minterms == [] do %>
+                        <p class="text-slate-500 italic">No minterms (expression is always false)</p>
+                      <% else %>
+                        <div class="space-y-3">
+                          <div>
+                            <span class="text-xs text-slate-500 uppercase font-medium">Decimal:</span>
+                            <div class="flex flex-wrap gap-2 mt-1">
+                              <%= for minterm <- @details.minterms do %>
+                                <span class="font-mono bg-slate-100 text-slate-700 px-2 py-1 rounded border border-slate-200">
+                                  {minterm}
+                                </span>
+                              <% end %>
+                            </div>
+                          </div>
+                          <div>
+                            <span class="text-xs text-slate-500 uppercase font-medium">Binary:</span>
+                            <div class="flex flex-wrap gap-2 mt-1">
+                              <%= for minterm <- @details.minterms do %>
+                                <span class="font-mono bg-slate-100 text-slate-700 px-2 py-1 rounded border border-slate-200">
+                                  {Integer.to_string(minterm, 2) |> String.pad_leading(length(@details.variables), "0")}
+                                </span>
+                              <% end %>
+                            </div>
+                          </div>
+                        </div>
+                      <% end %>
+                    </div>
+                  </div>
+                </div>
+
                 <%= for {step, index} <- Enum.with_index(@details.qmc_steps) do %>
                   <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                     <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
@@ -369,6 +384,99 @@
                         end)
                         |> Enum.join("")}
                       </span>
+                    <% end %>
+                  </div>
+                </div>
+
+                <!-- Coverage Table Section -->
+                <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                  <div class="bg-purple-50 px-6 py-4 border-b border-purple-200">
+                    <h3 class="font-bold text-purple-900">Coverage Table</h3>
+                    <p class="text-sm text-purple-700 mt-1">Shows which prime implicants cover each minterm</p>
+                  </div>
+                  <div class="p-6">
+                    <div class="overflow-x-auto">
+                      <table class="min-w-full text-sm">
+                        <thead>
+                          <tr class="text-left text-slate-500 border-b border-slate-200">
+                            <th class="pb-2 font-medium">Minterm</th>
+                            <th class="pb-2 font-medium">Binary</th>
+                            <th class="pb-2 font-medium">Covered By Prime Implicants</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                          <%= for minterm <- @details.minterms do %>
+                            <tr>
+                              <td class="py-2 text-slate-600 font-mono">{minterm}</td>
+                              <td class="py-2 text-slate-600 font-mono">
+                                {Integer.to_string(minterm, 2) |> String.pad_leading(length(@details.variables), "0")}
+                              </td>
+                              <td class="py-2">
+                                <div class="flex flex-wrap gap-2">
+                                  <%= for imp <- Map.get(@details.coverage_map, minterm, []) do %>
+                                    <span class="font-mono bg-purple-50 text-purple-700 px-2 py-0.5 rounded border border-purple-100">
+                                      {Enum.map(imp, fn
+                                        true -> "1"
+                                        false -> "0"
+                                        :dont_care -> "-"
+                                      end)
+                                      |> Enum.join("")}
+                                    </span>
+                                  <% end %>
+                                </div>
+                              </td>
+                            </tr>
+                          <% end %>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Petrick's Method Section -->
+                <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                  <div class="bg-amber-50 px-6 py-4 border-b border-amber-200">
+                    <h3 class="font-bold text-amber-900">Petrick's Method - Minimal Covers</h3>
+                    <p class="text-sm text-amber-700 mt-1">All minimal sets of prime implicants that cover all minterms</p>
+                  </div>
+                  <div class="p-6 space-y-4">
+                    <%= if @details.minimal_covers == [] do %>
+                      <p class="text-slate-500 italic">No minimal covers found</p>
+                    <% else %>
+                      <%= for {cover_set, index} <- Enum.with_index(@details.minimal_covers) do %>
+                        <% cover = MapSet.to_list(cover_set) %>
+                        <div class={[
+                          "border rounded-lg p-4",
+                          if(cover_set == @details.selected_cover,
+                            do: "border-amber-400 bg-amber-50",
+                            else: "border-slate-200 bg-slate-50"
+                          )
+                        ]}>
+                          <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-semibold text-slate-700">
+                              Cover #{index + 1}
+                              <%= if cover_set == @details.selected_cover do %>
+                                <span class="ml-2 text-xs bg-amber-500 text-white px-2 py-0.5 rounded">SELECTED</span>
+                              <% end %>
+                            </h4>
+                            <span class="text-xs text-slate-500">
+                              {length(cover)} implicant(s), {Enum.reduce(cover, 0, fn pi, acc -> acc + Enum.count(pi, &(&1 != :dont_care)) end)} literal(s)
+                            </span>
+                          </div>
+                          <div class="flex flex-wrap gap-2">
+                            <%= for imp <- cover do %>
+                              <span class="font-mono bg-white text-amber-700 px-3 py-1 rounded border border-amber-200">
+                                {Enum.map(imp, fn
+                                  true -> "1"
+                                  false -> "0"
+                                  :dont_care -> "-"
+                                end)
+                                |> Enum.join("")}
+                              </span>
+                            <% end %>
+                          </div>
+                        </div>
+                      <% end %>
                     <% end %>
                   </div>
                 </div>

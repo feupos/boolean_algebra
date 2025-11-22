@@ -42,17 +42,4 @@ defmodule BooleanAlgebraWeb.SimplifierLiveTest do
     assert page_live |> element("button[phx-value-tab='steps']") |> render_click() =~
              "Detailed Steps (QMC)"
   end
-
-  test "changes format", %{conn: conn} do
-    {:ok, page_live, _html} = live(conn, "/")
-
-    # Default is word (AND)
-    # Change to symbolic (&)
-    assert page_live |> element("button[phx-value-format='symbolic']") |> render_click() =~
-             "Symbolic"
-
-    # We can verify the format effect by submitting an expression and checking the output
-    # But the output format depends on the `operators` option passed to `simplify_with_details`.
-    # Let's just verify the event handling for now.
-  end
 end

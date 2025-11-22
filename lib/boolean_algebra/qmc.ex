@@ -40,36 +40,47 @@ defmodule BooleanAlgebra.QMC do
     # Group implicants by number of 1s on first call or regroup after merging
     grouped_implicants = group_by_ones(implicants)
 
-    initial_step = %{type: :grouping, groups: grouped_implicants}
+    initial_step = %{type: :initial_grouping, groups: grouped_implicants}
 
     group_keys = Map.keys(grouped_implicants) |> Enum.sort()
 
     # Iterate through groups and try to merge adjacent groups
-    {next_generation_groups, unmerged_from_current_pass, merge_details} =
-      Enum.reduce(group_keys, {%{}, [], []}, fn key,
-                                                {acc_next_groups, acc_unmerged, acc_merges} ->
+    {next_generation_groups, unmerged_from_current_pass, merge_details, _last_used} =
+      Enum.reduce(group_keys, {%{}, [], [], MapSet.new()}, fn key,
+                                                {acc_next_groups, acc_unmerged, acc_merges, used_from_prev} ->
         current_group = Map.get(grouped_implicants, key, [])
         next_group = Map.get(grouped_implicants, key + 1, [])
 
-        {merged_implicants, unmerged_in_this_step} =
+        {merged_implicants, unmerged_in_this_step_raw, used_in_next} =
           merge_adjacent_groups(current_group, next_group)
+
+        # Filter out items that were used in the previous merge (with group key-1)
+        unmerged_in_this_step = Enum.reject(unmerged_in_this_step_raw, fn imp ->
+          MapSet.member?(used_from_prev, imp)
+        end)
 
         new_next_groups =
           if merged_implicants != [] do
-            Map.update(acc_next_groups, key, merged_implicants, &(merged_implicants ++ &1))
+            Map.update(acc_next_groups, key, merged_implicants, &(Enum.uniq(merged_implicants ++ &1)))
           else
             acc_next_groups
           end
 
-        # Record merge details for this pair of groups
-        merge_info = %{
-          group: key,
-          next_group: key + 1,
-          merged: merged_implicants,
-          unmerged: unmerged_in_this_step
-        }
+        # Only record merge details if next_group actually exists
+        new_merges =
+          if next_group != [] do
+            merge_info = %{
+              group: key,
+              next_group: key + 1,
+              merged: Enum.uniq(merged_implicants),
+              unmerged: unmerged_in_this_step
+            }
+            [merge_info | acc_merges]
+          else
+            acc_merges
+          end
 
-        {new_next_groups, acc_unmerged ++ unmerged_in_this_step, [merge_info | acc_merges]}
+        {new_next_groups, acc_unmerged ++ unmerged_in_this_step, new_merges, used_in_next}
       end)
 
     merge_step = %{
@@ -106,29 +117,32 @@ defmodule BooleanAlgebra.QMC do
   end
 
   # Merges two groups of implicants (e.g. group with N ones and group with N+1 ones)
-  # Returns {merged_implicants, unmerged_from_group1}
+  # Returns {merged_implicants, unmerged_from_group1, used_from_group2}
   defp merge_adjacent_groups(group1, group2) do
     indexed_group1 = Enum.with_index(group1)
 
-    {merged_list, merged_indices} =
-      Enum.reduce(indexed_group1, {[], MapSet.new()}, fn {imp1, idx1},
-                                                         {acc_merged, acc_indices} ->
+    {merged_list, merged_indices_1, used_from_group2} =
+      Enum.reduce(indexed_group1, {[], MapSet.new(), MapSet.new()}, fn {imp1, idx1},
+                                                         {acc_merged, acc_indices, acc_used_2} ->
         matches = Enum.filter(group2, &can_merge?(imp1, &1))
 
         if matches != [] do
-          new_merges = Enum.map(matches, &merge(imp1, &1))
-          {acc_merged ++ new_merges, MapSet.put(acc_indices, idx1)}
+          new_merges = Enum.map(matches, &merge(imp1, &1)) |> Enum.uniq()
+
+          new_used_2 = Enum.reduce(matches, acc_used_2, fn m, set -> MapSet.put(set, m) end)
+
+          {acc_merged ++ new_merges, MapSet.put(acc_indices, idx1), new_used_2}
         else
-          {acc_merged, acc_indices}
+          {acc_merged, acc_indices, acc_used_2}
         end
       end)
 
     unmerged_from_group1 =
       indexed_group1
-      |> Enum.reject(fn {_imp, idx} -> MapSet.member?(merged_indices, idx) end)
+      |> Enum.reject(fn {_imp, idx} -> MapSet.member?(merged_indices_1, idx) end)
       |> Enum.map(fn {imp, _} -> imp end)
 
-    {merged_list, unmerged_from_group1}
+    {merged_list, unmerged_from_group1, used_from_group2}
   end
 
   # Checks if two implicants can merge (differ by exactly one bit)
@@ -151,7 +165,9 @@ defmodule BooleanAlgebra.QMC do
 
   # Groups implicants by number of 1s (ignoring :dont_care bits)
   defp group_by_ones(implicants) when is_list(implicants) do
-    Enum.group_by(implicants, &count_ones_in_implicant/1)
+    implicants
+    |> Enum.uniq()
+    |> Enum.group_by(&count_ones_in_implicant/1)
   end
 
   defp count_ones_in_implicant(implicant_list) do

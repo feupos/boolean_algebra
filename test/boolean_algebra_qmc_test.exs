@@ -63,4 +63,68 @@ defmodule BooleanAlgebra.QMCTest do
     {primes, _steps} = QMC.prime_implicants([], 3)
     assert primes == []
   end
+
+  describe "Wikipedia QMC example" do
+    # Reference: https://en.wikipedia.org/wiki/Quine%E2%80%93McCluskey_algorithm
+    # Minterms: [4, 8, 10, 11, 12, 15], Don't cares: [9, 14]
+    test "finds correct prime implicants and minimal covers with don't cares" do
+      # Including don't cares as minterms: [4, 8, 9, 10, 11, 12, 14, 15]
+      minterms = [4, 8, 9, 10, 11, 12, 14, 15]
+      num_vars = 4
+
+      {prime_implicants, qmc_steps} = QMC.prime_implicants(minterms, num_vars)
+
+      # Verify we have QMC steps
+      assert length(qmc_steps) > 0
+      assert List.first(qmc_steps).type == :initial_grouping
+
+      # Expected prime implicants (in binary ABCD format):
+      # 10-- = A&!B (covers 8, 9, 10, 11)
+      # 1-1- = A&C (covers 10, 11, 14, 15)
+      # -100 = B&!C&!D (covers 4, 12)
+      # Plus others...
+
+      # Verify key prime implicants exist
+      assert [true, false, :dont_care, :dont_care] in prime_implicants  # 10-- = A&!B
+      assert [true, :dont_care, true, :dont_care] in prime_implicants   # 1-1- = A&C
+      assert [:dont_care, true, false, false] in prime_implicants       # -100 = B&!C&!D
+
+      # Build coverage table
+      coverage_map = QMC.coverage_table(prime_implicants, minterms, num_vars)
+
+      # Verify all minterms are covered
+      assert Map.keys(coverage_map) |> Enum.sort() == Enum.sort(minterms)
+
+      # Find minimal covers using Petrick's method
+      minimal_covers = BooleanAlgebra.Petrick.minimal_cover(coverage_map)
+
+      # Should find multiple minimal covers
+      assert length(minimal_covers) > 0
+
+      # Find the best cover (minimum literals)
+      best_cover = Enum.min_by(minimal_covers, fn cover ->
+        cover_list = MapSet.to_list(cover)
+        Enum.reduce(cover_list, 0, fn pi, acc ->
+          acc + Enum.count(pi, &(&1 != :dont_care))
+        end)
+      end)
+
+      best_cover_list = MapSet.to_list(best_cover)
+      total_literals = Enum.reduce(best_cover_list, 0, fn pi, acc ->
+        acc + Enum.count(pi, &(&1 != :dont_care))
+      end)
+
+      # The minimal solution should have 7 literals total
+      # One valid solution: A&!B (2) + A&C (2) + B&!C&!D (3) = 7 literals
+      assert total_literals == 7
+
+      # Verify the best cover contains exactly 3 implicants
+      assert length(best_cover_list) == 3
+
+      # Verify it includes the key implicants
+      assert [true, false, :dont_care, :dont_care] in best_cover_list or  # A&!B
+             [true, :dont_care, true, :dont_care] in best_cover_list       # A&C
+      assert [:dont_care, true, false, false] in best_cover_list           # B&!C&!D
+    end
+  end
 end
