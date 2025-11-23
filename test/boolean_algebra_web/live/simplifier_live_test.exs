@@ -42,4 +42,12 @@ defmodule BooleanAlgebraWeb.SimplifierLiveTest do
     assert page_live |> element("button[phx-value-tab='steps']") |> render_click() =~
              "Detailed Steps (QMC)"
   end
+
+  test "sets example expression", %{conn: conn} do
+    {:ok, page_live, _html} = live(conn, "/")
+
+    assert page_live
+           |> element("button[phx-click='set_example'][phx-value-example='!(A & B)']")
+           |> render_click() =~ "!(A &amp; B)"
+  end
 end

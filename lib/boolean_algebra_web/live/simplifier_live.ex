@@ -28,6 +28,10 @@ defmodule BooleanAlgebraWeb.SimplifierLive do
     {:noreply, assign(socket, active_tab: String.to_existing_atom(tab))}
   end
 
+  def handle_event("set_example", %{"example" => example}, socket) do
+    {:noreply, assign(socket, input: example, error: nil)}
+  end
+
 
 
   def handle_info({:run_simplification, expr}, socket) do
