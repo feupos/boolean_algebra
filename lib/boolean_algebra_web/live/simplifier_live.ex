@@ -1,6 +1,7 @@
 defmodule BooleanAlgebraWeb.SimplifierLive do
   use BooleanAlgebraWeb, :live_view
   alias BooleanAlgebra
+  alias BooleanAlgebra
 
   def mount(_params, _session, socket) do
     {:ok,
@@ -11,7 +12,10 @@ defmodule BooleanAlgebraWeb.SimplifierLive do
        truth_table: [],
        error: nil,
        active_tab: :simplification,
-       loading: false
+       loading: false,
+       contact_subject: "",
+       contact_message: "",
+       mailto_link: "mailto:fneves@alunos.utfpr.edu.br?subject=Boolean%20Algebra%20Support"
      )}
   end
 
@@ -30,6 +34,22 @@ defmodule BooleanAlgebraWeb.SimplifierLive do
 
   def handle_event("set_example", %{"example" => example}, socket) do
     {:noreply, assign(socket, input: example, error: nil)}
+  end
+
+  def handle_event("update_contact_form", %{"subject" => subject, "message" => message}, socket) do
+    subject_part = if subject == "", do: "Boolean Algebra Support", else: subject
+
+    body = "Source: Boolean Algebra Website\n\n" <> message
+
+    params = %{
+      "subject" => subject_part,
+      "body" => body
+    }
+
+    query = URI.encode_query(params)
+    link = "mailto:fneves@alunos.utfpr.edu.br?#{query}"
+
+    {:noreply, assign(socket, contact_subject: subject, contact_message: message, mailto_link: link)}
   end
 
 

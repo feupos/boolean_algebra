@@ -549,9 +549,19 @@
           <p class="text-xs text-slate-500 mb-3">
             Found a bug? Have a suggestion? Feel free to reach out.
           </p>
-          <div class="bg-slate-50 p-2 rounded border border-slate-100 font-mono text-sm text-slate-600 select-all">
-            fneves@alunos.utfpr.edu.br
-          </div>
+          <form phx-change="update_contact_form" onsubmit="return false;" class="space-y-3">
+            <div>
+              <label for="contact-subject" class="sr-only">Subject</label>
+              <input type="text" name="subject" id="contact-subject" value={@contact_subject} placeholder="Subject" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all">
+            </div>
+            <div>
+              <label for="contact-message" class="sr-only">Message</label>
+              <textarea name="message" id="contact-message" rows="3" placeholder="How can we help?" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all resize-none"><%= @contact_message %></textarea>
+            </div>
+            <a href={@mailto_link} class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm flex items-center justify-center">
+              Send Message (via Email App)
+            </a>
+          </form>
         </div>
       </div>
       <div class="mt-8 text-center text-xs text-slate-400">
