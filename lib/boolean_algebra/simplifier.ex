@@ -112,107 +112,6 @@ defmodule BooleanAlgebra.Simplifier do
     end
   end
 
-  # ============================================================================
-  # ABSORPTION LAW WITH NEGATION: X | (!X & Y) = X | Y
-  # ============================================================================
-
-  # Pattern: !A | (A & B) = !A | B
-  defp apply_rules({:or, {:not, a1}, {:and, a2, b}}) when a1 == a2 do
-    apply_rules({:or, {:not, a1}, b})
-  end
-
-  defp apply_rules({:or, {:not, a1}, {:and, b, a2}}) when a1 == a2 do
-    apply_rules({:or, {:not, a1}, b})
-  end
-
-  # Pattern: (A & B) | !A = !A | B (commutative)
-  defp apply_rules({:or, {:and, a1, b}, {:not, a2}}) when a1 == a2 do
-    apply_rules({:or, {:not, a2}, b})
-  end
-
-  defp apply_rules({:or, {:and, b, a1}, {:not, a2}}) when a1 == a2 do
-    apply_rules({:or, {:not, a2}, b})
-  end
-
-  # Pattern: A | (!A & B) = A | B
-  defp apply_rules({:or, a1, {:and, {:not, a2}, b}}) when a1 == a2 do
-    apply_rules({:or, a1, b})
-  end
-
-  defp apply_rules({:or, a1, {:and, b, {:not, a2}}}) when a1 == a2 do
-    apply_rules({:or, a1, b})
-  end
-
-  # Pattern: (!A & B) | A = A | B (commutative)
-  defp apply_rules({:or, {:and, {:not, a1}, b}, a2}) when a1 == a2 do
-    apply_rules({:or, a2, b})
-  end
-
-  defp apply_rules({:or, {:and, b, {:not, a1}}, a2}) when a1 == a2 do
-    apply_rules({:or, a2, b})
-  end
-
-  # ============================================================================
-  # NESTED OR PATTERNS: Handle (A & B) | ((A & C) | !A)
-  # ============================================================================
-
-  # Pattern: (A & B) | ((A & C) | !A) - flatten and simplify
-  defp apply_rules({:or, {:and, a1, b}, {:or, {:and, a2, c}, {:not, a3}}})
-       when a1 == a2 and a2 == a3 do
-    # This is: (A & B) | (A & C) | !A
-    # Factor: A(B | C) | !A = !A | (B | C)
-    apply_rules({:or, {:not, a3}, {:or, b, c}})
-  end
-
-  # Pattern: (A & B) | (!A | (A & C)) - different nesting order
-  defp apply_rules({:or, {:and, a1, b}, {:or, {:not, a2}, {:and, a3, c}}})
-       when a1 == a2 and a2 == a3 do
-    apply_rules({:or, {:not, a2}, {:or, b, c}})
-  end
-
-  # ============================================================================
-  # STANDARD ABSORPTION LAW: X | (X & Y) = X
-  # ============================================================================
-
-  # Pattern: A | (A & B) = A
-  defp apply_rules({:or, a1, {:and, a2, _b}}) when a1 == a2 do
-    apply_rules(a1)
-  end
-
-  defp apply_rules({:or, a1, {:and, _b, a2}}) when a1 == a2 do
-    apply_rules(a1)
-  end
-
-  # Pattern: (A & B) | A = A (commutative)
-  defp apply_rules({:or, {:and, a1, _b}, a2}) when a1 == a2 do
-    apply_rules(a2)
-  end
-
-  defp apply_rules({:or, {:and, _b, a1}, a2}) when a1 == a2 do
-    apply_rules(a2)
-  end
-
-  # Pattern: A & (A | B) = A
-  defp apply_rules({:and, a1, {:or, a2, _b}}) when a1 == a2 do
-    apply_rules(a1)
-  end
-
-  defp apply_rules({:and, a1, {:or, _b, a2}}) when a1 == a2 do
-    apply_rules(a1)
-  end
-
-  # Pattern: (A | B) & A = A (commutative)
-  defp apply_rules({:and, {:or, a1, _b}, a2}) when a1 == a2 do
-    apply_rules(a2)
-  end
-
-  defp apply_rules({:and, {:or, _b, a1}, a2}) when a1 == a2 do
-    apply_rules(a2)
-  end
-
-  # ============================================================================
-  # XOR SIMPLIFICATION
-  # ============================================================================
 
   # Simplify XOR expressed as OR of ANDs
   defp apply_rules({:or, {:and, {:not, a}, b}, {:and, {:not, b}, a}}),
@@ -227,14 +126,10 @@ defmodule BooleanAlgebra.Simplifier do
   defp apply_rules({:or, {:and, a, {:not, b}}, {:and, b, {:not, a}}}),
     do: apply_rules({:xor, a, b})
 
-  # ============================================================================
-  # RECURSIVE APPLICATION
-  # ============================================================================
-
+  # Recursive application of rules
   defp apply_rules({op, left, right}) when op in [:and, :or, :xor] do
     {op, apply_rules(left), apply_rules(right)}
   end
-
   defp apply_rules({:not, expr}), do: {:not, apply_rules(expr)}
   defp apply_rules(expr), do: expr
 end
