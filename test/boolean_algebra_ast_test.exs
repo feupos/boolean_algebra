@@ -114,4 +114,20 @@ defmodule BooleanAlgebraASTTest do
     vars = AST.variables(ast)
     assert Enum.sort(vars) == ["x", "y", "z"]
   end
+
+  test "calculate complexity of AST" do
+    assert AST.complexity(AST.const_node(true)) == 1
+    assert AST.complexity(AST.var_node("x")) == 1
+    assert AST.complexity(AST.not_node(AST.var_node("x"))) == 1
+    assert AST.complexity(AST.and_node(AST.var_node("x"), AST.var_node("y"))) == 2
+
+    ast =
+      AST.and_node(
+        AST.or_node(AST.var_node("x"), AST.var_node("y")),
+        AST.xor_node(AST.not_node(AST.var_node("z")), AST.const_node(true))
+      )
+
+    # x, y, z, true -> 4 literals
+    assert AST.complexity(ast) == 4
+  end
 end

@@ -36,7 +36,7 @@ defmodule BooleanAlgebra.Petrick do
 
   defp expand_and_minimize([]), do: []
 
-  # distribute_sumss two sums: (A | B) & (C | D) = (A & C) | (A & D) | (B & C) | (B & D)
+  # distribute_sums two sums: (A | B) & (C | D) = (A & C) | (A & D) | (B & C) | (B & D)
   defp distribute_sums(sum1, sum2) do
     for term1 <- sum1, term2 <- sum2 do
       MapSet.union(term1, term2)

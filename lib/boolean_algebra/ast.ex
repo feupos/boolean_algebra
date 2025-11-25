@@ -69,20 +69,31 @@ defmodule BooleanAlgebra.AST do
   @doc """
   Extracts all variable names from the expression.
   """
-  def variables(expr),
-    do:
-      variables(expr, MapSet.new())
-      |> MapSet.to_list()
-      |> Enum.uniq()
-      |> Enum.sort()
-
-  defp variables({:var, name}, acc), do: MapSet.put(acc, name)
-  defp variables({:const, _}, acc), do: acc
-  defp variables({:not, expr}, acc), do: variables(expr, acc)
-
-  defp variables({op, left, right}, acc) when op in [:and, :or, :xor, :implies, :equiv] do
-    acc |> variables(left, &variables/2) |> variables(right, &variables/2)
+  @spec variables(t()) :: [String.t()]
+  def variables(expr) do
+    expr
+    |> collect_variables(MapSet.new())
+    |> MapSet.to_list()
+    |> Enum.sort()
   end
 
-  defp variables(acc, expr, fun), do: fun.(expr, acc)
+  defp collect_variables({:var, name}, acc), do: MapSet.put(acc, name)
+  defp collect_variables({:const, _}, acc), do: acc
+  defp collect_variables({:not, expr}, acc), do: collect_variables(expr, acc)
+
+  defp collect_variables({op, left, right}, acc) when op in [:and, :or, :xor] do
+    acc
+    |> then(&collect_variables(left, &1))
+    |> then(&collect_variables(right, &1))
+  end
+
+  @doc """
+  Calculates the complexity of the expression.
+  Complexity is defined as the number of literals (variables and constants) in the expression.
+  """
+  @spec complexity(t()) :: non_neg_integer()
+  def complexity({:var, _}), do: 1
+  def complexity({:const, _}), do: 1
+  def complexity({:not, expr}), do: complexity(expr)
+  def complexity({_op, left, right}), do: complexity(left) + complexity(right)
 end
